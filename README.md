@@ -26,7 +26,10 @@ protein_gnn_v13/
 ├── docs/
 │   └── ARCHITECTURE.md        # Full deep-learning breakdown
 ├── scripts/
-│   └── run_pipeline.py        # End-to-end orchestrator (CLI)
+│   ├── build_graphs.py        # STEP 1 — PDB/CIF → PyG multi-chain graphs
+│   ├── extract_esm2_embeddings.py  # STEP 2 — ESM2 per-residue embedding extraction
+│   ├── run_pipeline.py        # STEP 3 — End-to-end training orchestrator (CLI)
+│   └── esm2_finetune.py       # Optional — LoRA fine-tuning of ESM2
 └── src/
     ├── config.py              # All hyperparameters and paths
     ├── model/
@@ -47,25 +50,40 @@ protein_gnn_v13/
 ## Quick Start
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# Full training pipeline (needs v10 graphs + v11 ESM2 embeddings)
+# 2. Build protein graphs from PDB files (STEP 1 — ~2-4 hours for full dataset)
+python scripts/build_graphs.py \
+    --pdb-dir data/pdbs \
+    --output-dir data/graphs \
+    --threshold 10.0 \
+    --max-neighbors 32 \
+    --workers 4
+
+# 3. Extract ESM2 per-residue embeddings (STEP 2 — requires GPU, ~4-8 hours)
+python scripts/extract_esm2_embeddings.py --from-graphs \
+    --graphs-dir data/graphs \
+    --output-dir data/esm2_embeddings \
+    --model esm2_t33_650M_UR50D \
+    --resume
+
+# 4. Run full training pipeline (STEP 3 — requires GPU, ~12-24 hours)
 python scripts/run_pipeline.py \
-    --graphs-dir  ../output_v10/graphs_v10 \
-    --esm2-dir    ../output_v11/esm2_embeddings \
-    --output-dir  ../output_v13
+    --graphs-dir data/graphs \
+    --esm2-dir   data/esm2_embeddings \
+    --output-dir outputs/
 
 # Resume interrupted training
 python scripts/run_pipeline.py \
-    --graphs-dir ../output_v10/graphs_v10 \
-    --output-dir ../output_v13 \
+    --graphs-dir data/graphs \
+    --output-dir outputs/ \
     --resume
 
 # Ablation: disable hierarchical chain pooling (reproduces v11/v12 behaviour)
 python scripts/run_pipeline.py \
-    --graphs-dir ../output_v10/graphs_v10 \
-    --output-dir ../output_v13_ablation \
+    --graphs-dir data/graphs \
+    --output-dir outputs/ablation_no_chain_pool/ \
     --no-chain-pool
 ```
 
