@@ -1,0 +1,2394 @@
+(venv) PS D:\College\BE PROJECT\BE_Project_new> python run_pipeline_v13.py --output-dir output_v13 --graphs-dir output_v10/graphs_v10
+D:\College\BE PROJECT\BE_Project_new\venv\Lib\site-packages\torch\cuda\__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+============================================================
+  v13 Pipeline - Hierarchical Chain-Aware Pooling
+  Building on v12 with chain→protein hierarchy
+  Key additions:
+    - Chain attention pool (residues → chains)
+    - Protein chain pool   (chains → protein)
+    - CC cross-attention   (protein × chains → CC context)
+    - Chain-aware pooling:  True
+    - GO hierarchy loss (weight=0.05)
+    - Ancestor propagation at inference
+  Reuses:
+    - v10 graphs:       output_v10/graphs_v10
+    - v11 ESM2:         output_v11\esm2_embeddings
+  OBO file:             annotations/go-basic.obo
+  Started: 2026-03-05 16:59:05
+============================================================
+
+============================================================
+STEP 0: Download / Verify GO OBO File
+============================================================
+  OBO file found: annotations/go-basic.obo (30.5 MB)
+
+  Parsing OBO file...
+[GO-DAG] Parsing OBO file: annotations\go-basic.obo
+[GO-DAG] Parsed 38736 terms with 65124 direct edges
+
+  OBO setup complete in 0.3s
+
+============================================================
+STEP 1: Verify Ancestor Closure in Annotations
+============================================================
+  Loading dataset to get GO term vocabularies...
+Parsing annotation file: annotations\nrPDB-GO_2019.06.18_annot.tsv
+Parsed 36641 annotated proteins
+Unique GO terms: MF=489, BP=1943, CC=320
+Vocabulary sizes (after filtering): MF=489, BP=1943, CC=320
+[v10] Built PDB-level annotations: 32397 PDBs from 36641 chain-level entries
+[v11] ESM2 embeddings: 31465 files, 31465 indexed, dim=1280
+Total graph IDs (v11 PDB-level): 32397
+Splits: train=25917, val=3240, test=3240
+Scanning 316 batch files...
+Loading graph locations: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 316/316 [00:33<00:00,  9.30it/s]
+Found 23565 valid graphs
+Scanning 316 batch files...
+Loading graph locations: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 316/316 [00:27<00:00, 11.29it/s]
+Found 2956 valid graphs
+Scanning 316 batch files...
+Loading graph locations: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 316/316 [00:23<00:00, 13.59it/s]
+Found 2935 valid graphs
+ESM2 coverage estimate: 95/100 (95%) of sampled train IDs
+  Vocabulary sizes: MF=489, BP=1943, CC=320
+[GO-DAG] MF ancestor closure: 0.974 (avg 5.3 terms/protein, 3948/4052 ancestor terms present)
+[GO-DAG] BP ancestor closure: 0.980 (avg 18.8 terms/protein, 25157/25676 ancestor terms present)
+[GO-DAG] CC ancestor closure: 0.966 (avg 2.7 terms/protein, 2188/2266 ancestor terms present)
+
+  Ancestor verification complete in 1.4m
+
+============================================================
+STEP 2: Train v13 Model (Hierarchical Chain-Aware Pooling)
+============================================================
+  Graphs dir:        output_v10/graphs_v10
+  ESM2 dir:          output_v11\esm2_embeddings
+  ESM2 dim:          1280
+  OBO file:          annotations/go-basic.obo
+  Checkpoint dir:    output_v13\checkpoints
+  VRAM:              8.0 GB
+  Batch size:        16
+  Accum steps:       1
+  Effective batch:   16
+  Learning rate:     0.0005
+  Chain-aware pool:  True
+  Hier loss:         True (weight=0.05, margin=0.0)
+  Propagation:       True
+  Label embed:       True
+  Cooc regularizer:  True
+  AMP:               True
+
+  Creating v13 data loaders (v10 graphs + ESM2 embeddings)...
+Parsing annotation file: annotations\nrPDB-GO_2019.06.18_annot.tsv
+Parsed 36641 annotated proteins
+Unique GO terms: MF=489, BP=1943, CC=320
+Vocabulary sizes (after filtering): MF=489, BP=1943, CC=320
+[v10] Built PDB-level annotations: 32397 PDBs from 36641 chain-level entries
+[v11] ESM2 embeddings: 31465 files, 31465 indexed, dim=1280
+Total graph IDs (v11 PDB-level): 32397
+Splits: train=25917, val=3240, test=3240
+Scanning 316 batch files...
+Loading graph locations: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 316/316 [00:21<00:00, 14.59it/s]
+Found 23565 valid graphs
+Scanning 316 batch files...
+Loading graph locations: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 316/316 [00:20<00:00, 15.30it/s]
+Found 2956 valid graphs
+Scanning 316 batch files...
+Loading graph locations: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 316/316 [00:21<00:00, 14.95it/s]
+Found 2935 valid graphs
+ESM2 coverage estimate: 95/100 (95%) of sampled train IDs
+    Train: 23565
+    Val:   2956
+    Test:  2935
+    Classes: MF=489, BP=1943, CC=320
+    ESM2: available=True, dim=1280
+
+  Building GO-DAG components...
+[GO-DAG] Vocabulary 489 terms → 463 DAG edges
+[GO-DAG] Vocabulary 1943 terms → 2663 DAG edges
+[GO-DAG] Vocabulary 320 terms → 378 DAG edges
+  HierarchicalConsistencyLoss: 463 edges, weight=0.05, margin=0.0
+  HierarchicalConsistencyLoss: 2663 edges, weight=0.05, margin=0.0
+  HierarchicalConsistencyLoss: 378 edges, weight=0.05, margin=0.0
+    Hierarchy losses built
+[GO-DAG] Ancestor matrix: 489×489, 1057 ancestor relationships
+[GO-DAG] Ancestor matrix: 1943×1943, 9764 ancestor relationships
+[GO-DAG] Ancestor matrix: 320×320, 1020 ancestor relationships
+  AncestorPropagator: 239/489 terms have descendants
+  AncestorPropagator: 1168/1943 terms have descendants
+  AncestorPropagator: 181/320 terms have descendants
+    Ancestor propagators built
+
+  Preparing co-occurrence regularization...
+
+  Creating v13 model (chain-aware pooling: True)...
+    Parameters: 2,276,359
+
+    Parameter breakdown:
+      chain_embedding: 512 (0.0%)
+      node_encoder: 9,792 (0.4%)
+      esm_fusion: 320,257 (14.1%)
+      edge_encoder: 1,152 (0.1%)
+      dual_conv_blocks: 596,736 (26.2%)
+      gated_pool: 37,249 (1.6%)
+      pool_fuse: 111,168 (4.9%)
+      chain_attn_pool: 37,249 (1.6%)
+      protein_chain_pool: 37,249 (1.6%)
+      chain_proj: 37,440 (1.6%)
+      cc_context_attn: 185,472 (8.1%)
+      head_mf: 205,738 (9.0%)
+      head_bp: 486,360 (21.4%)
+      head_cc: 209,985 (9.2%)
+Using device: cuda
+GPU: NVIDIA GeForce RTX 4060 Laptop GPU (8.0 GB)
+Model parameters: 2,276,359
+  Co-occurrence regularizer: 304 term pairs (Jaccard >= 0.8)
+  Co-occurrence regularizer: 2246 term pairs (Jaccard >= 0.8)
+  Co-occurrence regularizer: 190 term pairs (Jaccard >= 0.8)
+  Hierarchy losses: 3/3 ontologies
+  Ancestor propagators: 3/3 ontologies
+
+======================================================================
+Starting v13 Training (Hierarchical Chain-Aware Pooling)
+======================================================================
+  Architecture: Dual-Conv (GCN + GATv2) × 4
+  Hidden dim: 192
+  GAT heads: 6
+  Chain embedding: 8-dim
+  ESM2 dim: 1280
+  ESM2 fusion: Gated (learned per-node)
+  Max chains: 64
+  Chain-aware pooling: True
+  Triple pooling: Gated + Mean + Max (residue-level)
+  Label embeddings: True
+  AMP: True
+  Gradient checkpointing: True
+  Hierarchy loss: MF=True, BP=True, CC=True
+  Ancestor propagation: MF=True, BP=True, CC=True
+  Epochs: 100
+  Batch size: 16
+  Gradient accumulation: 1
+  Effective batch: 16
+  Learning rate: 0.0005
+  Early stopping: 20
+======================================================================
+
+Epoch 1 [Train]: 100%|███████████████████████████████████████████████████████████████| 1472/1472 [36:55<00:00,  1.51s/it, loss=0.105, lr=3.17e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 1 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:34<00:00,  3.92it/s]
+
+Epoch 1/100 (2326.4s)
+  Train Loss: 0.1052
+  Val Loss:   0.0432
+  --- Global Threshold Fmax ---
+  MF: 0.1473  BP: 0.1367  CC: 0.1249  Avg: 0.1363
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.1407  BP: 0.1693  CC: 0.2709  Avg: 0.1936
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.1407  BP: 0.1690  CC: 0.2712  Avg: 0.1936 (Δ-0.0000)
+  Best Fmax: 0.1936 (best)
+  LR: 0.000032
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.502, bias_mean=-0.006
+  Chain pool: chain_gate_bias=0.005, protein_gate_bias=0.002
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.81
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.1936)
+Epoch 2 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [34:01<00:00,  1.39s/it, loss=0.0462, lr=6.58e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 2 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:57<00:00,  6.46it/s]
+
+Epoch 2/100 (2110.3s)
+  Train Loss: 0.0462
+  Val Loss:   0.0367
+  --- Global Threshold Fmax ---
+  MF: 0.3198  BP: 0.2256  CC: 0.2673  Avg: 0.2709
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.2319  BP: 0.2447  CC: 0.3505  Avg: 0.2757
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.2314  BP: 0.2436  CC: 0.3472  Avg: 0.2741 (Δ-0.0016)
+  Best Fmax: 0.2757 (best)
+  LR: 0.000066
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.532, bias_mean=-0.002
+  Chain pool: chain_gate_bias=0.006, protein_gate_bias=0.003
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.94
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 2 W
+  → Saved best model (Fmax_best: 0.2757)
+Epoch 3 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:50<00:00,  1.38s/it, loss=0.0398, lr=0.000119, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 3 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.77it/s]
+
+Epoch 3/100 (2096.9s)
+  Train Loss: 0.0398
+  Val Loss:   0.0324
+  --- Global Threshold Fmax ---
+  MF: 0.4490  BP: 0.2757  CC: 0.3199  Avg: 0.3482
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.3614  BP: 0.2991  CC: 0.4140  Avg: 0.3581
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.3650  BP: 0.2970  CC: 0.4211  Avg: 0.3610 (Δ+0.0029)
+  Best Fmax: 0.3610 (best)
+  LR: 0.000119
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.562, bias_mean=0.002
+  Chain pool: chain_gate_bias=0.006, protein_gate_bias=0.003
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.80
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 57°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.3610)
+Epoch 4 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:58<00:00,  1.38s/it, loss=0.0353, lr=0.000186, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 4 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:22<00:00,  4.50it/s]
+
+Epoch 4/100 (2131.6s)
+  Train Loss: 0.0353
+  Val Loss:   0.0309
+  --- Global Threshold Fmax ---
+  MF: 0.4992  BP: 0.2908  CC: 0.3158  Avg: 0.3686
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.4283  BP: 0.3380  CC: 0.3967  Avg: 0.3877
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.4293  BP: 0.3323  CC: 0.3979  Avg: 0.3865 (Δ-0.0012)
+  Best Fmax: 0.3877 (best)
+  LR: 0.000186
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.594, bias_mean=0.006
+  Chain pool: chain_gate_bias=0.006, protein_gate_bias=0.003
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.91
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 2 W
+  → Saved best model (Fmax_best: 0.3877)
+Epoch 5 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [33:29<00:00,  1.36s/it, loss=0.0324, lr=0.00026, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 5 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:04<00:00,  5.70it/s]
+
+Epoch 5/100 (2085.9s)
+  Train Loss: 0.0324
+  Val Loss:   0.0299
+  --- Global Threshold Fmax ---
+  MF: 0.5411  BP: 0.3127  CC: 0.3118  Avg: 0.3885
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.4857  BP: 0.3837  CC: 0.3748  Avg: 0.4147
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.4855  BP: 0.3776  CC: 0.3700  Avg: 0.4110 (Δ-0.0037)
+  Best Fmax: 0.4147 (best)
+  LR: 0.000260
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.620, bias_mean=0.009
+  Chain pool: chain_gate_bias=0.006, protein_gate_bias=0.003
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.72
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.4147)
+Epoch 6 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:03<00:00,  1.35s/it, loss=0.0307, lr=0.000334, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 6 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:57<00:00,  6.39it/s]
+
+Epoch 6/100 (2053.1s)
+  Train Loss: 0.0307
+  Val Loss:   0.0291
+  --- Global Threshold Fmax ---
+  MF: 0.5689  BP: 0.3244  CC: 0.3360  Avg: 0.4098
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.5187  BP: 0.4027  CC: 0.4121  Avg: 0.4445
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.5116  BP: 0.3894  CC: 0.4122  Avg: 0.4377 (Δ-0.0068)
+  Best Fmax: 0.4445 (best)
+  LR: 0.000334
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.655, bias_mean=0.013
+  Chain pool: chain_gate_bias=0.007, protein_gate_bias=0.003
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.74
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.4445)
+Epoch 7 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:49<00:00,  1.34s/it, loss=0.0297, lr=0.000401, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 7 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:48<00:00,  7.68it/s]
+
+Epoch 7/100 (2029.7s)
+  Train Loss: 0.0297
+  Val Loss:   0.0281
+  --- Global Threshold Fmax ---
+  MF: 0.5877  BP: 0.3473  CC: 0.3553  Avg: 0.4301
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.5433  BP: 0.4321  CC: 0.4240  Avg: 0.4664
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.5402  BP: 0.4225  CC: 0.4211  Avg: 0.4613 (Δ-0.0051)
+  Best Fmax: 0.4664 (best)
+  LR: 0.000401
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.689, bias_mean=0.016
+  Chain pool: chain_gate_bias=0.007, protein_gate_bias=0.001
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.90
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.4664)
+Epoch 8 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [33:13<00:00,  1.35s/it, loss=0.029, lr=0.000454, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 8 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.10it/s]
+
+Epoch 8/100 (2057.8s)
+  Train Loss: 0.0290
+  Val Loss:   0.0274
+  --- Global Threshold Fmax ---
+  MF: 0.6119  BP: 0.3713  CC: 0.3643  Avg: 0.4492
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.5816  BP: 0.4527  CC: 0.4307  Avg: 0.4884
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.5794  BP: 0.4471  CC: 0.4325  Avg: 0.4863 (Δ-0.0020)
+  Best Fmax: 0.4884 (best)
+  LR: 0.000454
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.738, bias_mean=0.020
+  Chain pool: chain_gate_bias=0.008, protein_gate_bias=-0.000
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.79
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.4884)
+Epoch 9 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:16<00:00,  1.36s/it, loss=0.0283, lr=0.000488, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 9 [Val]: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.98it/s]
+
+Epoch 9/100 (2061.9s)
+  Train Loss: 0.0283
+  Val Loss:   0.0280
+  --- Global Threshold Fmax ---
+  MF: 0.5970  BP: 0.3700  CC: 0.3661  Avg: 0.4444
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6049  BP: 0.4560  CC: 0.4573  Avg: 0.5061
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.5969  BP: 0.4421  CC: 0.4511  Avg: 0.4967 (Δ-0.0094)
+  Best Fmax: 0.5061 (best)
+  LR: 0.000488
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.780, bias_mean=0.024
+  Chain pool: chain_gate_bias=0.008, protein_gate_bias=-0.002
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.75
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5061)
+Epoch 10 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [33:12<00:00,  1.35s/it, loss=0.0275, lr=0.0005, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 10 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.10it/s]
+
+Epoch 10/100 (2057.0s)
+  Train Loss: 0.0275
+  Val Loss:   0.0268
+  --- Global Threshold Fmax ---
+  MF: 0.6405  BP: 0.3796  CC: 0.3754  Avg: 0.4652
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6280  BP: 0.4760  CC: 0.4586  Avg: 0.5209
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6255  BP: 0.4700  CC: 0.4572  Avg: 0.5176 (Δ-0.0033)
+  Best Fmax: 0.5209 (best)
+  LR: 0.000500
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.831, bias_mean=0.026
+  Chain pool: chain_gate_bias=0.009, protein_gate_bias=-0.004
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.90
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5209)
+Epoch 11 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [33:22<00:00,  1.36s/it, loss=0.0267, lr=0.0005, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 11 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.00it/s]
+
+Epoch 11/100 (2066.9s)
+  Train Loss: 0.0267
+  Val Loss:   0.0261
+  --- Global Threshold Fmax ---
+  MF: 0.6518  BP: 0.3944  CC: 0.3859  Avg: 0.4774
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6214  BP: 0.4799  CC: 0.4754  Avg: 0.5256
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6192  BP: 0.4719  CC: 0.4661  Avg: 0.5191 (Δ-0.0065)
+  Best Fmax: 0.5256 (best)
+  LR: 0.000500
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.877, bias_mean=0.028
+  Chain pool: chain_gate_bias=0.009, protein_gate_bias=-0.006
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.91
+  GPU: 0% | VRAM: 1.82/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5256)
+Epoch 12 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [40:31<00:00,  1.65s/it, loss=0.0259, lr=0.000499, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 12 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:46<00:00,  3.48it/s]
+
+Epoch 12/100 (2550.6s)
+  Train Loss: 0.0259
+  Val Loss:   0.0257
+  --- Global Threshold Fmax ---
+  MF: 0.6601  BP: 0.4019  CC: 0.4028  Avg: 0.4883
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6547  BP: 0.4907  CC: 0.4817  Avg: 0.5424
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6494  BP: 0.4848  CC: 0.4807  Avg: 0.5383 (Δ-0.0041)
+  Best Fmax: 0.5424 (best)
+  LR: 0.000499
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.927, bias_mean=0.030
+  Chain pool: chain_gate_bias=0.009, protein_gate_bias=-0.008
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.85
+  GPU: 0% | VRAM: 1.90/8.00 GB | Temp: 54°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5424)
+Epoch 13 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [1:00:18<00:00,  2.46s/it, loss=0.025, lr=0.000499, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 13 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:57<00:00,  3.14it/s]
+
+Epoch 13/100 (3784.7s)
+  Train Loss: 0.0250
+  Val Loss:   0.0261
+  --- Global Threshold Fmax ---
+  MF: 0.6711  BP: 0.4110  CC: 0.3797  Avg: 0.4873
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6539  BP: 0.5049  CC: 0.4704  Avg: 0.5431
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6520  BP: 0.4900  CC: 0.4646  Avg: 0.5355 (Δ-0.0075)
+  Best Fmax: 0.5431 (best)
+  LR: 0.000499
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=0.983, bias_mean=0.032
+  Chain pool: chain_gate_bias=0.008, protein_gate_bias=-0.010
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.75
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 52°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5431)
+Epoch 14 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [44:15<00:00,  1.80s/it, loss=0.0243, lr=0.000498, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 14 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:59<00:00,  6.19it/s]
+
+Epoch 14/100 (2726.8s)
+  Train Loss: 0.0243
+  Val Loss:   0.0258
+  --- Global Threshold Fmax ---
+  MF: 0.6806  BP: 0.4204  CC: 0.4038  Avg: 0.5016
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6610  BP: 0.5259  CC: 0.4708  Avg: 0.5526
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6562  BP: 0.5224  CC: 0.4697  Avg: 0.5494 (Δ-0.0031)
+  Best Fmax: 0.5526 (best)
+  LR: 0.000498
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.033
+  Chain pool: chain_gate_bias=0.008, protein_gate_bias=-0.013
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.83
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5526)
+Epoch 15 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:22<00:00,  1.36s/it, loss=0.0237, lr=0.000496, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 15 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:01<00:00,  6.03it/s]
+
+Epoch 15/100 (2076.1s)
+  Train Loss: 0.0237
+  Val Loss:   0.0254
+  --- Global Threshold Fmax ---
+  MF: 0.6897  BP: 0.4299  CC: 0.4108  Avg: 0.5101
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6817  BP: 0.5233  CC: 0.4938  Avg: 0.5663
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6754  BP: 0.5136  CC: 0.4893  Avg: 0.5594 (Δ-0.0068)
+  Best Fmax: 0.5663 (best)
+  LR: 0.000496
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.006, bias_mean=0.034
+  Chain pool: chain_gate_bias=0.008, protein_gate_bias=-0.014
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.81
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5663)
+Epoch 16 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:39<00:00,  1.37s/it, loss=0.0231, lr=0.000495, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 16 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:28<00:00,  4.18it/s]
+
+Epoch 16/100 (2120.1s)
+  Train Loss: 0.0231
+  Val Loss:   0.0254
+  --- Global Threshold Fmax ---
+  MF: 0.6943  BP: 0.4259  CC: 0.3977  Avg: 0.5060
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6804  BP: 0.5175  CC: 0.4927  Avg: 0.5635
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6752  BP: 0.5038  CC: 0.4834  Avg: 0.5541 (Δ-0.0094)
+  Best Fmax: 0.5635
+  LR: 0.000495
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.035
+  Chain pool: chain_gate_bias=0.007, protein_gate_bias=-0.017
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.93
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 53°C | Power: 1 W
+Epoch 17 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:57<00:00,  1.38s/it, loss=0.0225, lr=0.000493, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 17 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.21it/s]
+
+Epoch 17/100 (2101.2s)
+  Train Loss: 0.0225
+  Val Loss:   0.0250
+  --- Global Threshold Fmax ---
+  MF: 0.6993  BP: 0.4420  CC: 0.4192  Avg: 0.5202
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6983  BP: 0.5342  CC: 0.4829  Avg: 0.5718
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6971  BP: 0.5299  CC: 0.4838  Avg: 0.5703 (Δ-0.0015)
+  Best Fmax: 0.5718 (best)
+  LR: 0.000493
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.005, bias_mean=0.035
+  Chain pool: chain_gate_bias=0.008, protein_gate_bias=-0.019
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.92
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5718)
+Epoch 18 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [32:43<00:00,  1.33s/it, loss=0.022, lr=0.00049, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 18 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.07it/s]
+
+Epoch 18/100 (2027.5s)
+  Train Loss: 0.0220
+  Val Loss:   0.0251
+  --- Global Threshold Fmax ---
+  MF: 0.7059  BP: 0.4471  CC: 0.4143  Avg: 0.5224
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6904  BP: 0.5447  CC: 0.5264  Avg: 0.5871
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6826  BP: 0.5375  CC: 0.5133  Avg: 0.5778 (Δ-0.0094)
+  Best Fmax: 0.5871 (best)
+  LR: 0.000490
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.037
+  Chain pool: chain_gate_bias=0.007, protein_gate_bias=-0.021
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.75
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5871)
+Epoch 19 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:48<00:00,  1.34s/it, loss=0.0214, lr=0.000488, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 19 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.65it/s]
+
+Epoch 19/100 (2036.2s)
+  Train Loss: 0.0214
+  Val Loss:   0.0256
+  --- Global Threshold Fmax ---
+  MF: 0.6969  BP: 0.4389  CC: 0.4108  Avg: 0.5155
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.6941  BP: 0.5441  CC: 0.5003  Avg: 0.5795
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6827  BP: 0.5277  CC: 0.4903  Avg: 0.5669 (Δ-0.0126)
+  Best Fmax: 0.5795
+  LR: 0.000488
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.006, bias_mean=0.037
+  Chain pool: chain_gate_bias=0.006, protein_gate_bias=-0.024
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.77
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 20 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:49<00:00,  1.34s/it, loss=0.021, lr=0.000485, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 20 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:50<00:00,  7.27it/s]
+
+Epoch 20/100 (2032.7s)
+  Train Loss: 0.0210
+  Val Loss:   0.0255
+  --- Global Threshold Fmax ---
+  MF: 0.7034  BP: 0.4559  CC: 0.4140  Avg: 0.5244
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7083  BP: 0.5558  CC: 0.4996  Avg: 0.5879
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6987  BP: 0.5475  CC: 0.5026  Avg: 0.5829 (Δ-0.0050)
+  Best Fmax: 0.5879 (best)
+  LR: 0.000485
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.037
+  Chain pool: chain_gate_bias=0.005, protein_gate_bias=-0.027
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.70
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5879)
+Epoch 21 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:01<00:00,  1.35s/it, loss=0.0204, lr=0.000482, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 21 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.23it/s]
+
+Epoch 21/100 (2044.5s)
+  Train Loss: 0.0204
+  Val Loss:   0.0256
+  --- Global Threshold Fmax ---
+  MF: 0.7122  BP: 0.4642  CC: 0.4153  Avg: 0.5306
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7096  BP: 0.5582  CC: 0.4693  Avg: 0.5790
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6966  BP: 0.5526  CC: 0.4729  Avg: 0.5740 (Δ-0.0050)
+  Best Fmax: 0.5790
+  LR: 0.000482
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.009, bias_mean=0.037
+  Chain pool: chain_gate_bias=0.005, protein_gate_bias=-0.028
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.78
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 22 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [32:59<00:00,  1.35s/it, loss=0.02, lr=0.000478, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 22 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:56<00:00,  6.54it/s]
+
+Epoch 22/100 (2048.4s)
+  Train Loss: 0.0200
+  Val Loss:   0.0254
+  --- Global Threshold Fmax ---
+  MF: 0.7181  BP: 0.4558  CC: 0.4223  Avg: 0.5320
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7038  BP: 0.5553  CC: 0.5045  Avg: 0.5879
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7000  BP: 0.5426  CC: 0.5017  Avg: 0.5814 (Δ-0.0064)
+  Best Fmax: 0.5879
+  LR: 0.000478
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.039
+  Chain pool: chain_gate_bias=0.004, protein_gate_bias=-0.030
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.84
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 23 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:01<00:00,  1.35s/it, loss=0.0197, lr=0.000475, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 23 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:50<00:00,  7.31it/s]
+
+Epoch 23/100 (2044.0s)
+  Train Loss: 0.0197
+  Val Loss:   0.0252
+  --- Global Threshold Fmax ---
+  MF: 0.7186  BP: 0.4693  CC: 0.4386  Avg: 0.5422
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7026  BP: 0.5754  CC: 0.5073  Avg: 0.5951
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.6979  BP: 0.5676  CC: 0.5061  Avg: 0.5905 (Δ-0.0045)
+  Best Fmax: 0.5951 (best)
+  LR: 0.000475
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.010, bias_mean=0.038
+  Chain pool: chain_gate_bias=0.004, protein_gate_bias=-0.033
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.73
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.5951)
+Epoch 24 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:57<00:00,  1.34s/it, loss=0.0192, lr=0.000471, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 24 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:50<00:00,  7.36it/s]
+
+Epoch 24/100 (2039.9s)
+  Train Loss: 0.0192
+  Val Loss:   0.0259
+  --- Global Threshold Fmax ---
+  MF: 0.7128  BP: 0.4705  CC: 0.4422  Avg: 0.5418
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7144  BP: 0.5742  CC: 0.5548  Avg: 0.6145
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7096  BP: 0.5692  CC: 0.5510  Avg: 0.6099 (Δ-0.0046)
+  Best Fmax: 0.6145 (best)
+  LR: 0.000471
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.038
+  Chain pool: chain_gate_bias=0.002, protein_gate_bias=-0.036
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.70
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 3 W
+  → Saved best model (Fmax_best: 0.6145)
+Epoch 25 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:53<00:00,  1.34s/it, loss=0.0188, lr=0.000467, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 25 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.84it/s]
+
+Epoch 25/100 (2039.3s)
+  Train Loss: 0.0188
+  Val Loss:   0.0255
+  --- Global Threshold Fmax ---
+  MF: 0.7081  BP: 0.4659  CC: 0.4345  Avg: 0.5362
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7119  BP: 0.5731  CC: 0.5055  Avg: 0.5968
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7036  BP: 0.5631  CC: 0.5030  Avg: 0.5899 (Δ-0.0069)
+  Best Fmax: 0.5968
+  LR: 0.000467
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.010, bias_mean=0.038
+  Chain pool: chain_gate_bias=0.001, protein_gate_bias=-0.039
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.90
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 26 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:58<00:00,  1.34s/it, loss=0.0184, lr=0.000462, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 26 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.90it/s]
+
+Epoch 26/100 (2043.8s)
+  Train Loss: 0.0184
+  Val Loss:   0.0257
+  --- Global Threshold Fmax ---
+  MF: 0.7322  BP: 0.4666  CC: 0.4405  Avg: 0.5464
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7261  BP: 0.5763  CC: 0.5314  Avg: 0.6113
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7193  BP: 0.5654  CC: 0.5268  Avg: 0.6038 (Δ-0.0074)
+  Best Fmax: 0.6113
+  LR: 0.000462
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.039
+  Chain pool: chain_gate_bias=0.000, protein_gate_bias=-0.040
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.71
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 27 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:07<00:00,  1.35s/it, loss=0.018, lr=0.000457, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 27 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.81it/s]
+
+Epoch 27/100 (2054.0s)
+  Train Loss: 0.0180
+  Val Loss:   0.0260
+  --- Global Threshold Fmax ---
+  MF: 0.7292  BP: 0.4884  CC: 0.4419  Avg: 0.5532
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7279  BP: 0.5846  CC: 0.5278  Avg: 0.6135
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7243  BP: 0.5743  CC: 0.5183  Avg: 0.6057 (Δ-0.0078)
+  Best Fmax: 0.6135
+  LR: 0.000457
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.011, bias_mean=0.039
+  Chain pool: chain_gate_bias=0.000, protein_gate_bias=-0.043
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.96
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 28 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:56<00:00,  1.34s/it, loss=0.0176, lr=0.000452, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 28 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:50<00:00,  7.31it/s]
+
+Epoch 28/100 (2038.5s)
+  Train Loss: 0.0176
+  Val Loss:   0.0252
+  --- Global Threshold Fmax ---
+  MF: 0.7249  BP: 0.4790  CC: 0.4304  Avg: 0.5448
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7282  BP: 0.5846  CC: 0.4933  Avg: 0.6021
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7203  BP: 0.5773  CC: 0.4922  Avg: 0.5966 (Δ-0.0054)
+  Best Fmax: 0.6021
+  LR: 0.000452
+  Patience: 4/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.039
+  Chain pool: chain_gate_bias=-0.001, protein_gate_bias=-0.046
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.91
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 29 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:03<00:00,  1.35s/it, loss=0.0173, lr=0.000447, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 29 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.87it/s]
+
+Epoch 29/100 (2049.0s)
+  Train Loss: 0.0173
+  Val Loss:   0.0260
+  --- Global Threshold Fmax ---
+  MF: 0.7291  BP: 0.4812  CC: 0.4276  Avg: 0.5460
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7242  BP: 0.5926  CC: 0.5275  Avg: 0.6148
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7187  BP: 0.5815  CC: 0.5272  Avg: 0.6091 (Δ-0.0056)
+  Best Fmax: 0.6148 (best)
+  LR: 0.000447
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.039
+  Chain pool: chain_gate_bias=-0.001, protein_gate_bias=-0.048
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.89
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6148)
+Epoch 30 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:55<00:00,  1.34s/it, loss=0.017, lr=0.000442, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 30 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:59<00:00,  6.20it/s]
+
+Epoch 30/100 (2047.1s)
+  Train Loss: 0.0170
+  Val Loss:   0.0269
+  --- Global Threshold Fmax ---
+  MF: 0.7267  BP: 0.4962  CC: 0.4363  Avg: 0.5530
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7231  BP: 0.5957  CC: 0.5437  Avg: 0.6208
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7165  BP: 0.5856  CC: 0.5403  Avg: 0.6141 (Δ-0.0067)
+  Best Fmax: 0.6208 (best)
+  LR: 0.000442
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.002, protein_gate_bias=-0.051
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.82
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6208)
+Epoch 31 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:22<00:00,  1.36s/it, loss=0.0167, lr=0.000436, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 31 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.90it/s]
+
+Epoch 31/100 (2068.5s)
+  Train Loss: 0.0167
+  Val Loss:   0.0268
+  --- Global Threshold Fmax ---
+  MF: 0.7292  BP: 0.4794  CC: 0.4448  Avg: 0.5512
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7297  BP: 0.5796  CC: 0.5297  Avg: 0.6130
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7237  BP: 0.5694  CC: 0.5279  Avg: 0.6070 (Δ-0.0060)
+  Best Fmax: 0.6130
+  LR: 0.000436
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.006, bias_mean=0.039
+  Chain pool: chain_gate_bias=-0.003, protein_gate_bias=-0.053
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.81
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 32 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:28<00:00,  1.36s/it, loss=0.0163, lr=0.00043, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 32 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.92it/s]
+
+Epoch 32/100 (2073.6s)
+  Train Loss: 0.0163
+  Val Loss:   0.0262
+  --- Global Threshold Fmax ---
+  MF: 0.7354  BP: 0.4928  CC: 0.4500  Avg: 0.5594
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7326  BP: 0.6001  CC: 0.5599  Avg: 0.6308
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7266  BP: 0.5897  CC: 0.5576  Avg: 0.6246 (Δ-0.0062)
+  Best Fmax: 0.6308 (best)
+  LR: 0.000430
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.011, bias_mean=0.039
+  Chain pool: chain_gate_bias=-0.004, protein_gate_bias=-0.055
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.87
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 2 W
+  → Saved best model (Fmax_best: 0.6308)
+Epoch 33 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:19<00:00,  1.36s/it, loss=0.0159, lr=0.000424, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 33 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.95it/s]
+
+Epoch 33/100 (2064.7s)
+  Train Loss: 0.0159
+  Val Loss:   0.0271
+  --- Global Threshold Fmax ---
+  MF: 0.7312  BP: 0.4936  CC: 0.4506  Avg: 0.5585
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7306  BP: 0.6038  CC: 0.5514  Avg: 0.6286
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7222  BP: 0.5937  CC: 0.5446  Avg: 0.6201 (Δ-0.0085)
+  Best Fmax: 0.6286
+  LR: 0.000424
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.005, bias_mean=0.039
+  Chain pool: chain_gate_bias=-0.005, protein_gate_bias=-0.058
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.76
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 34 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:20<00:00,  1.36s/it, loss=0.0158, lr=0.000417, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 34 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.79it/s]
+
+Epoch 34/100 (2066.5s)
+  Train Loss: 0.0158
+  Val Loss:   0.0271
+  --- Global Threshold Fmax ---
+  MF: 0.7359  BP: 0.4947  CC: 0.4524  Avg: 0.5610
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7365  BP: 0.6011  CC: 0.5435  Avg: 0.6270
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7313  BP: 0.5934  CC: 0.5418  Avg: 0.6222 (Δ-0.0049)
+  Best Fmax: 0.6270
+  LR: 0.000417
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.005, protein_gate_bias=-0.061
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.77
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 35 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:20<00:00,  1.36s/it, loss=0.0154, lr=0.000411, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 35 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.85it/s]
+
+Epoch 35/100 (2066.3s)
+  Train Loss: 0.0154
+  Val Loss:   0.0274
+  --- Global Threshold Fmax ---
+  MF: 0.7449  BP: 0.4988  CC: 0.4521  Avg: 0.5653
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7502  BP: 0.6148  CC: 0.5505  Avg: 0.6385
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7432  BP: 0.6065  CC: 0.5231  Avg: 0.6243 (Δ-0.0143)
+  Best Fmax: 0.6385 (best)
+  LR: 0.000411
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.007, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.005, protein_gate_bias=-0.063
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.87
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6385)
+Epoch 36 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:20<00:00,  1.36s/it, loss=0.0152, lr=0.000404, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 36 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:49<00:00,  7.41it/s]
+
+Epoch 36/100 (2062.8s)
+  Train Loss: 0.0152
+  Val Loss:   0.0281
+  --- Global Threshold Fmax ---
+  MF: 0.7395  BP: 0.4992  CC: 0.4463  Avg: 0.5617
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7495  BP: 0.6127  CC: 0.5113  Avg: 0.6245
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7439  BP: 0.5979  CC: 0.5068  Avg: 0.6162 (Δ-0.0083)
+  Best Fmax: 0.6245
+  LR: 0.000404
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.039
+  Chain pool: chain_gate_bias=-0.005, protein_gate_bias=-0.065
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.77
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 37 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:16<00:00,  1.36s/it, loss=0.0148, lr=0.000397, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 37 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.64it/s]
+
+Epoch 37/100 (2064.5s)
+  Train Loss: 0.0148
+  Val Loss:   0.0278
+  --- Global Threshold Fmax ---
+  MF: 0.7451  BP: 0.5048  CC: 0.4549  Avg: 0.5683
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7470  BP: 0.6080  CC: 0.5382  Avg: 0.6311
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7398  BP: 0.6001  CC: 0.5339  Avg: 0.6246 (Δ-0.0065)
+  Best Fmax: 0.6311
+  LR: 0.000397
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.007, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.005, protein_gate_bias=-0.067
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.86
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 57°C | Power: 1 W
+Epoch 38 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:46<00:00,  1.38s/it, loss=0.0146, lr=0.00039, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 38 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:28<00:00,  4.19it/s]
+
+Epoch 38/100 (2126.7s)
+  Train Loss: 0.0146
+  Val Loss:   0.0271
+  --- Global Threshold Fmax ---
+  MF: 0.7355  BP: 0.4959  CC: 0.4406  Avg: 0.5573
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7394  BP: 0.6024  CC: 0.5310  Avg: 0.6243
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7325  BP: 0.5913  CC: 0.5241  Avg: 0.6160 (Δ-0.0083)
+  Best Fmax: 0.6243
+  LR: 0.000390
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.005, protein_gate_bias=-0.069
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.83
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 39 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [35:01<00:00,  1.43s/it, loss=0.0143, lr=0.000382, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 39 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.67it/s]
+
+Epoch 39/100 (2169.3s)
+  Train Loss: 0.0143
+  Val Loss:   0.0284
+  --- Global Threshold Fmax ---
+  MF: 0.7446  BP: 0.5080  CC: 0.4564  Avg: 0.5696
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7449  BP: 0.6198  CC: 0.5694  Avg: 0.6447
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7394  BP: 0.6088  CC: 0.5635  Avg: 0.6372 (Δ-0.0075)
+  Best Fmax: 0.6447 (best)
+  LR: 0.000382
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.006, protein_gate_bias=-0.072
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=2.11
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 58°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6447)
+Epoch 40 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:33<00:00,  1.37s/it, loss=0.014, lr=0.000375, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 40 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.89it/s]
+
+Epoch 40/100 (2079.7s)
+  Train Loss: 0.0140
+  Val Loss:   0.0280
+  --- Global Threshold Fmax ---
+  MF: 0.7492  BP: 0.5189  CC: 0.4534  Avg: 0.5738
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7525  BP: 0.6199  CC: 0.5561  Avg: 0.6428
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7491  BP: 0.6161  CC: 0.5391  Avg: 0.6347 (Δ-0.0081)
+  Best Fmax: 0.6428
+  LR: 0.000375
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.006, protein_gate_bias=-0.074
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.70
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 59°C | Power: 1 W
+Epoch 41 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:34<00:00,  1.37s/it, loss=0.0138, lr=0.000367, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 41 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.68it/s]
+
+Epoch 41/100 (2082.3s)
+  Train Loss: 0.0138
+  Val Loss:   0.0284
+  --- Global Threshold Fmax ---
+  MF: 0.7478  BP: 0.5111  CC: 0.4552  Avg: 0.5714
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7530  BP: 0.6260  CC: 0.5631  Avg: 0.6473
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7435  BP: 0.6198  CC: 0.5623  Avg: 0.6419 (Δ-0.0055)
+  Best Fmax: 0.6473 (best)
+  LR: 0.000367
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.006, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.007, protein_gate_bias=-0.076
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.80
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 58°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6473)
+Epoch 42 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:34<00:00,  1.37s/it, loss=0.0136, lr=0.00036, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 42 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.77it/s]
+
+Epoch 42/100 (2081.0s)
+  Train Loss: 0.0136
+  Val Loss:   0.0293
+  --- Global Threshold Fmax ---
+  MF: 0.7521  BP: 0.5116  CC: 0.4541  Avg: 0.5726
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7519  BP: 0.6296  CC: 0.5372  Avg: 0.6396
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7407  BP: 0.6188  CC: 0.5348  Avg: 0.6314 (Δ-0.0081)
+  Best Fmax: 0.6396
+  LR: 0.000360
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.007, protein_gate_bias=-0.077
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.82
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 57°C | Power: 1 W
+Epoch 43 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:24<00:00,  1.36s/it, loss=0.0132, lr=0.000352, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 43 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.73it/s]
+
+Epoch 43/100 (2071.5s)
+  Train Loss: 0.0132
+  Val Loss:   0.0288
+  --- Global Threshold Fmax ---
+  MF: 0.7511  BP: 0.5144  CC: 0.4650  Avg: 0.5768
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7564  BP: 0.6286  CC: 0.5531  Avg: 0.6461
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7524  BP: 0.6155  CC: 0.5495  Avg: 0.6392 (Δ-0.0069)
+  Best Fmax: 0.6461
+  LR: 0.000352
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.008, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.008, protein_gate_bias=-0.080
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.68
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 44 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:28<00:00,  1.36s/it, loss=0.013, lr=0.000344, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 44 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.03it/s]
+
+Epoch 44/100 (2072.6s)
+  Train Loss: 0.0130
+  Val Loss:   0.0284
+  --- Global Threshold Fmax ---
+  MF: 0.7506  BP: 0.5180  CC: 0.4616  Avg: 0.5767
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7652  BP: 0.6212  CC: 0.5572  Avg: 0.6478
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7596  BP: 0.6089  CC: 0.5489  Avg: 0.6392 (Δ-0.0087)
+  Best Fmax: 0.6478 (best)
+  LR: 0.000344
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.009, protein_gate_bias=-0.081
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=2.10
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6478)
+Epoch 45 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:24<00:00,  1.36s/it, loss=0.0127, lr=0.000336, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 45 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.91it/s]
+
+Epoch 45/100 (2070.0s)
+  Train Loss: 0.0127
+  Val Loss:   0.0291
+  --- Global Threshold Fmax ---
+  MF: 0.7525  BP: 0.5147  CC: 0.4604  Avg: 0.5758
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7609  BP: 0.6263  CC: 0.5559  Avg: 0.6477
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7514  BP: 0.6146  CC: 0.5557  Avg: 0.6406 (Δ-0.0071)
+  Best Fmax: 0.6477
+  LR: 0.000336
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.006, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.009, protein_gate_bias=-0.082
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.86
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 46 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:32<00:00,  1.37s/it, loss=0.0126, lr=0.000327, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 46 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:58<00:00,  6.34it/s]
+
+Epoch 46/100 (2082.6s)
+  Train Loss: 0.0126
+  Val Loss:   0.0290
+  --- Global Threshold Fmax ---
+  MF: 0.7532  BP: 0.5201  CC: 0.4696  Avg: 0.5810
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7573  BP: 0.6302  CC: 0.5517  Avg: 0.6464
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7559  BP: 0.6253  CC: 0.5488  Avg: 0.6433 (Δ-0.0031)
+  Best Fmax: 0.6464
+  LR: 0.000327
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.084
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.85
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 47 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:35<00:00,  1.37s/it, loss=0.0123, lr=0.000319, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 47 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:02<00:00,  5.89it/s]
+
+Epoch 47/100 (2090.1s)
+  Train Loss: 0.0123
+  Val Loss:   0.0302
+  --- Global Threshold Fmax ---
+  MF: 0.7514  BP: 0.5193  CC: 0.4657  Avg: 0.5788
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7594  BP: 0.6292  CC: 0.5699  Avg: 0.6528
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7526  BP: 0.6206  CC: 0.5631  Avg: 0.6454 (Δ-0.0074)
+  Best Fmax: 0.6528 (best)
+  LR: 0.000319
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.009, bias_mean=0.040
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.086
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.91
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6528)
+Epoch 48 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [33:07<00:00,  1.35s/it, loss=0.0121, lr=0.00031, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 48 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:00<00:00,  6.08it/s]
+
+Epoch 48/100 (2060.7s)
+  Train Loss: 0.0121
+  Val Loss:   0.0304
+  --- Global Threshold Fmax ---
+  MF: 0.7576  BP: 0.5216  CC: 0.4617  Avg: 0.5803
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7576  BP: 0.6366  CC: 0.5595  Avg: 0.6512
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7545  BP: 0.6308  CC: 0.5552  Avg: 0.6468 (Δ-0.0044)
+  Best Fmax: 0.6512
+  LR: 0.000310
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.088
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.89
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 49 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [34:23<00:00,  1.40s/it, loss=0.0119, lr=0.000302, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 49 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.75it/s]
+
+Epoch 49/100 (2130.2s)
+  Train Loss: 0.0119
+  Val Loss:   0.0300
+  --- Global Threshold Fmax ---
+  MF: 0.7541  BP: 0.5197  CC: 0.4647  Avg: 0.5795
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7645  BP: 0.6233  CC: 0.5511  Avg: 0.6463
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7573  BP: 0.6164  CC: 0.5476  Avg: 0.6404 (Δ-0.0059)
+  Best Fmax: 0.6463
+  LR: 0.000302
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.089
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.98
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 50 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:37<00:00,  1.37s/it, loss=0.0116, lr=0.000293, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 50 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.21it/s]
+
+Epoch 50/100 (2080.6s)
+  Train Loss: 0.0116
+  Val Loss:   0.0313
+  --- Global Threshold Fmax ---
+  MF: 0.7591  BP: 0.5232  CC: 0.4559  Avg: 0.5794
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7636  BP: 0.6306  CC: 0.5394  Avg: 0.6445
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7560  BP: 0.6219  CC: 0.5358  Avg: 0.6379 (Δ-0.0066)
+  Best Fmax: 0.6445
+  LR: 0.000293
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.091
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.90
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 51 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:30<00:00,  1.37s/it, loss=0.0114, lr=0.000285, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 51 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:56<00:00,  6.57it/s]
+
+Epoch 51/100 (2079.2s)
+  Train Loss: 0.0114
+  Val Loss:   0.0320
+  --- Global Threshold Fmax ---
+  MF: 0.7598  BP: 0.5266  CC: 0.4661  Avg: 0.5842
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7691  BP: 0.6382  CC: 0.5501  Avg: 0.6524
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7594  BP: 0.6286  CC: 0.5427  Avg: 0.6436 (Δ-0.0089)
+  Best Fmax: 0.6524
+  LR: 0.000285
+  Patience: 4/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.009, protein_gate_bias=-0.092
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.89
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 52 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [34:30<00:00,  1.41s/it, loss=0.0112, lr=0.000276, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 52 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:25<00:00,  4.32it/s]
+
+Epoch 52/100 (2168.1s)
+  Train Loss: 0.0112
+  Val Loss:   0.0317
+  --- Global Threshold Fmax ---
+  MF: 0.7634  BP: 0.5293  CC: 0.4694  Avg: 0.5874
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7704  BP: 0.6374  CC: 0.5700  Avg: 0.6593
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7643  BP: 0.6299  CC: 0.5615  Avg: 0.6519 (Δ-0.0074)
+  Best Fmax: 0.6593 (best)
+  LR: 0.000276
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.094
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.78
+  GPU: 8% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 3 W
+  → Saved best model (Fmax_best: 0.6593)
+Epoch 53 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [35:59<00:00,  1.47s/it, loss=0.011, lr=0.000267, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 53 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:28<00:00,  4.20it/s]
+
+Epoch 53/100 (2259.9s)
+  Train Loss: 0.0110
+  Val Loss:   0.0322
+  --- Global Threshold Fmax ---
+  MF: 0.7629  BP: 0.5301  CC: 0.4718  Avg: 0.5883
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7614  BP: 0.6421  CC: 0.5606  Avg: 0.6547
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7572  BP: 0.6333  CC: 0.5526  Avg: 0.6477 (Δ-0.0070)
+  Best Fmax: 0.6547
+  LR: 0.000267
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.095
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.78
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 54 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:29<00:00,  1.37s/it, loss=0.0108, lr=0.000259, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 54 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:59<00:00,  6.25it/s]
+
+Epoch 54/100 (2081.0s)
+  Train Loss: 0.0108
+  Val Loss:   0.0326
+  --- Global Threshold Fmax ---
+  MF: 0.7646  BP: 0.5331  CC: 0.4651  Avg: 0.5876
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7728  BP: 0.6458  CC: 0.5645  Avg: 0.6610
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7641  BP: 0.6349  CC: 0.5575  Avg: 0.6522 (Δ-0.0088)
+  Best Fmax: 0.6610 (best)
+  LR: 0.000259
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.097
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.76
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6610)
+Epoch 55 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:59<00:00,  1.34s/it, loss=0.0105, lr=0.00025, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 55 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.95it/s]
+
+Epoch 55/100 (2045.0s)
+  Train Loss: 0.0105
+  Val Loss:   0.0314
+  --- Global Threshold Fmax ---
+  MF: 0.7666  BP: 0.5324  CC: 0.4740  Avg: 0.5910
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7715  BP: 0.6418  CC: 0.5773  Avg: 0.6635
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7634  BP: 0.6338  CC: 0.5730  Avg: 0.6568 (Δ-0.0068)
+  Best Fmax: 0.6635 (best)
+  LR: 0.000250
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.005, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.098
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.82
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6635)
+Epoch 56 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:00<00:00,  1.35s/it, loss=0.0103, lr=0.000241, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 56 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.88it/s]
+
+Epoch 56/100 (2046.1s)
+  Train Loss: 0.0103
+  Val Loss:   0.0319
+  --- Global Threshold Fmax ---
+  MF: 0.7652  BP: 0.5321  CC: 0.4645  Avg: 0.5873
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7702  BP: 0.6497  CC: 0.5479  Avg: 0.6560
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7600  BP: 0.6441  CC: 0.5449  Avg: 0.6497 (Δ-0.0063)
+  Best Fmax: 0.6560
+  LR: 0.000241
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.010, protein_gate_bias=-0.099
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.66
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 57 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:02<00:00,  1.35s/it, loss=0.0101, lr=0.000233, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 57 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:56<00:00,  6.59it/s]
+
+Epoch 57/100 (2051.2s)
+  Train Loss: 0.0101
+  Val Loss:   0.0328
+  --- Global Threshold Fmax ---
+  MF: 0.7671  BP: 0.5326  CC: 0.4672  Avg: 0.5889
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7731  BP: 0.6415  CC: 0.5621  Avg: 0.6589
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7658  BP: 0.6335  CC: 0.5532  Avg: 0.6508 (Δ-0.0081)
+  Best Fmax: 0.6589
+  LR: 0.000233
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.101
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.88
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 58 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:05<00:00,  1.35s/it, loss=0.00988, lr=0.000224, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 58 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.81it/s]
+
+Epoch 58/100 (2051.7s)
+  Train Loss: 0.0099
+  Val Loss:   0.0334
+  --- Global Threshold Fmax ---
+  MF: 0.7701  BP: 0.5342  CC: 0.4600  Avg: 0.5881
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7761  BP: 0.6452  CC: 0.5397  Avg: 0.6537
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7705  BP: 0.6388  CC: 0.5367  Avg: 0.6486 (Δ-0.0051)
+  Best Fmax: 0.6537
+  LR: 0.000224
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.005, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.102
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.80
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 53°C | Power: 1 W
+Epoch 59 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:26<00:00,  1.36s/it, loss=0.00968, lr=0.000215, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 59 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.01it/s]
+
+Epoch 59/100 (2071.4s)
+  Train Loss: 0.0097
+  Val Loss:   0.0341
+  --- Global Threshold Fmax ---
+  MF: 0.7686  BP: 0.5422  CC: 0.4634  Avg: 0.5914
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7717  BP: 0.6520  CC: 0.5571  Avg: 0.6603
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7665  BP: 0.6404  CC: 0.5557  Avg: 0.6542 (Δ-0.0061)
+  Best Fmax: 0.6603
+  LR: 0.000215
+  Patience: 4/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.103
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.87
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 60 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:46<00:00,  1.38s/it, loss=0.00949, lr=0.000207, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 60 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:28<00:00,  4.20it/s]
+
+Epoch 60/100 (2126.8s)
+  Train Loss: 0.0095
+  Val Loss:   0.0345
+  --- Global Threshold Fmax ---
+  MF: 0.7688  BP: 0.5367  CC: 0.4651  Avg: 0.5902
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7758  BP: 0.6557  CC: 0.5459  Avg: 0.6591
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7674  BP: 0.6479  CC: 0.5444  Avg: 0.6532 (Δ-0.0059)
+  Best Fmax: 0.6591
+  LR: 0.000207
+  Patience: 5/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.104
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.84
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 61 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [34:43<00:00,  1.42s/it, loss=0.00923, lr=0.000198, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 61 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:59<00:00,  6.18it/s]
+
+Epoch 61/100 (2155.2s)
+  Train Loss: 0.0092
+  Val Loss:   0.0346
+  --- Global Threshold Fmax ---
+  MF: 0.7695  BP: 0.5401  CC: 0.4705  Avg: 0.5934
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7777  BP: 0.6523  CC: 0.5613  Avg: 0.6638
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7686  BP: 0.6416  CC: 0.5564  Avg: 0.6555 (Δ-0.0083)
+  Best Fmax: 0.6638 (best)
+  LR: 0.000198
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.105
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.85
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6638)
+Epoch 62 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:35<00:00,  1.37s/it, loss=0.00908, lr=0.00019, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 62 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:03<00:00,  5.79it/s]
+
+Epoch 62/100 (2091.4s)
+  Train Loss: 0.0091
+  Val Loss:   0.0351
+  --- Global Threshold Fmax ---
+  MF: 0.7714  BP: 0.5413  CC: 0.4784  Avg: 0.5971
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7780  BP: 0.6557  CC: 0.5721  Avg: 0.6686
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7736  BP: 0.6455  CC: 0.5674  Avg: 0.6622 (Δ-0.0064)
+  Best Fmax: 0.6686 (best)
+  LR: 0.000190
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.106
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.67
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6686)
+Epoch 63 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:37<00:00,  1.37s/it, loss=0.00887, lr=0.000181, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 63 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.89it/s]
+
+Epoch 63/100 (2083.0s)
+  Train Loss: 0.0089
+  Val Loss:   0.0349
+  --- Global Threshold Fmax ---
+  MF: 0.7686  BP: 0.5390  CC: 0.4694  Avg: 0.5923
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7756  BP: 0.6518  CC: 0.5561  Avg: 0.6611
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7701  BP: 0.6450  CC: 0.5505  Avg: 0.6552 (Δ-0.0060)
+  Best Fmax: 0.6611
+  LR: 0.000181
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.107
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.83
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 64 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:19<00:00,  1.36s/it, loss=0.00871, lr=0.000173, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 64 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.79it/s]
+
+Epoch 64/100 (2066.2s)
+  Train Loss: 0.0087
+  Val Loss:   0.0351
+  --- Global Threshold Fmax ---
+  MF: 0.7694  BP: 0.5395  CC: 0.4757  Avg: 0.5949
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7804  BP: 0.6518  CC: 0.5568  Avg: 0.6630
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7740  BP: 0.6478  CC: 0.5540  Avg: 0.6586 (Δ-0.0044)
+  Best Fmax: 0.6630
+  LR: 0.000173
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.107
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.76
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 65 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:37<00:00,  1.37s/it, loss=0.00846, lr=0.000164, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 65 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.63it/s]
+
+Epoch 65/100 (2085.3s)
+  Train Loss: 0.0085
+  Val Loss:   0.0361
+  --- Global Threshold Fmax ---
+  MF: 0.7670  BP: 0.5378  CC: 0.4706  Avg: 0.5918
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7716  BP: 0.6516  CC: 0.5488  Avg: 0.6574
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7670  BP: 0.6440  CC: 0.5591  Avg: 0.6567 (Δ-0.0006)
+  Best Fmax: 0.6574
+  LR: 0.000164
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.108
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.82
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 2 W
+Epoch 66 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:19<00:00,  1.36s/it, loss=0.00831, lr=0.000156, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 66 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.61it/s]
+
+Epoch 66/100 (2067.6s)
+  Train Loss: 0.0083
+  Val Loss:   0.0366
+  --- Global Threshold Fmax ---
+  MF: 0.7723  BP: 0.5424  CC: 0.4723  Avg: 0.5957
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7782  BP: 0.6537  CC: 0.5749  Avg: 0.6689
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7723  BP: 0.6484  CC: 0.5621  Avg: 0.6609 (Δ-0.0080)
+  Best Fmax: 0.6689 (best)
+  LR: 0.000156
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.109
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.90
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6689)
+Epoch 67 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:32<00:00,  1.37s/it, loss=0.00811, lr=0.000148, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 67 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.76it/s]
+
+Epoch 67/100 (2079.8s)
+  Train Loss: 0.0081
+  Val Loss:   0.0368
+  --- Global Threshold Fmax ---
+  MF: 0.7730  BP: 0.5448  CC: 0.4740  Avg: 0.5973
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7846  BP: 0.6559  CC: 0.5579  Avg: 0.6661
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7781  BP: 0.6508  CC: 0.5484  Avg: 0.6591 (Δ-0.0070)
+  Best Fmax: 0.6661
+  LR: 0.000148
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.110
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.79
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 68 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:32<00:00,  1.37s/it, loss=0.00796, lr=0.00014, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 68 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.01it/s]
+
+Epoch 68/100 (2077.7s)
+  Train Loss: 0.0080
+  Val Loss:   0.0384
+  --- Global Threshold Fmax ---
+  MF: 0.7718  BP: 0.5498  CC: 0.4782  Avg: 0.5999
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7763  BP: 0.6616  CC: 0.5655  Avg: 0.6678
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7683  BP: 0.6559  CC: 0.5688  Avg: 0.6643 (Δ-0.0035)
+  Best Fmax: 0.6678
+  LR: 0.000140
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.041
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.111
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.95
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 69 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:39<00:00,  1.37s/it, loss=0.0077, lr=0.000133, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.15 GB reserved
+Epoch 69 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:59<00:00,  6.21it/s]
+
+Epoch 69/100 (2091.1s)
+  Train Loss: 0.0077
+  Val Loss:   0.0386
+  --- Global Threshold Fmax ---
+  MF: 0.7776  BP: 0.5455  CC: 0.4693  Avg: 0.5975
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7795  BP: 0.6609  CC: 0.5574  Avg: 0.6660
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7730  BP: 0.6514  CC: 0.5542  Avg: 0.6595 (Δ-0.0064)
+  Best Fmax: 0.6660
+  LR: 0.000133
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.042
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.111
+  VRAM (GB): alloc=0.04, reserved=1.46, peak=1.90
+  GPU: 0% | VRAM: 1.85/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 70 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:11<00:00,  1.35s/it, loss=0.00877, lr=0.000352, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 70 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.62it/s]
+
+Epoch 70/100 (2058.6s)
+  Train Loss: 0.0088
+  Val Loss:   0.0339
+  --- Global Threshold Fmax ---
+  MF: 0.7548  BP: 0.5266  CC: 0.4468  Avg: 0.5761
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7623  BP: 0.6314  CC: 0.5336  Avg: 0.6424
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7558  BP: 0.6216  CC: 0.5279  Avg: 0.6351 (Δ-0.0073)
+  Best Fmax: 0.6424
+  LR: 0.000352
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.042
+  Chain pool: chain_gate_bias=-0.011, protein_gate_bias=-0.112
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.84
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 71 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:37<00:00,  1.33s/it, loss=0.0117, lr=0.000495, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 71 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:49<00:00,  7.43it/s]
+
+Epoch 71/100 (2018.9s)
+  Train Loss: 0.0117
+  Val Loss:   0.0313
+  --- Global Threshold Fmax ---
+  MF: 0.7443  BP: 0.5102  CC: 0.4535  Avg: 0.5693
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7547  BP: 0.6282  CC: 0.5302  Avg: 0.6377
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7452  BP: 0.6204  CC: 0.5297  Avg: 0.6318 (Δ-0.0059)
+  Best Fmax: 0.6377
+  LR: 0.000495
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.009, bias_mean=0.042
+  Chain pool: chain_gate_bias=-0.012, protein_gate_bias=-0.115
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.76
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 57°C | Power: 1 W
+Epoch 72 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:18<00:00,  1.32s/it, loss=0.013, lr=0.000499, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 72 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.97it/s]
+
+Epoch 72/100 (2003.5s)
+  Train Loss: 0.0130
+  Val Loss:   0.0307
+  --- Global Threshold Fmax ---
+  MF: 0.7557  BP: 0.4980  CC: 0.4401  Avg: 0.5646
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7678  BP: 0.6243  CC: 0.5332  Avg: 0.6417
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7588  BP: 0.6170  CC: 0.5313  Avg: 0.6357 (Δ-0.0061)
+  Best Fmax: 0.6417
+  LR: 0.000499
+  Patience: 4/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.043
+  Chain pool: chain_gate_bias=-0.013, protein_gate_bias=-0.117
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=2.03
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 2 W
+Epoch 73 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:19<00:00,  1.32s/it, loss=0.013, lr=0.000495, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 73 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:50<00:00,  7.33it/s]
+
+Epoch 73/100 (2002.3s)
+  Train Loss: 0.0130
+  Val Loss:   0.0306
+  --- Global Threshold Fmax ---
+  MF: 0.7443  BP: 0.4964  CC: 0.4503  Avg: 0.5636
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7489  BP: 0.6188  CC: 0.5389  Avg: 0.6355
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7393  BP: 0.6096  CC: 0.5337  Avg: 0.6275 (Δ-0.0080)
+  Best Fmax: 0.6355
+  LR: 0.000495
+  Patience: 5/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.008, bias_mean=0.043
+  Chain pool: chain_gate_bias=-0.014, protein_gate_bias=-0.119
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.78
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 57°C | Power: 1 W
+Epoch 74 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:23<00:00,  1.32s/it, loss=0.0129, lr=0.000488, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 74 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:49<00:00,  7.52it/s]
+
+Epoch 74/100 (2005.1s)
+  Train Loss: 0.0129
+  Val Loss:   0.0314
+  --- Global Threshold Fmax ---
+  MF: 0.7447  BP: 0.5163  CC: 0.4465  Avg: 0.5692
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7606  BP: 0.6307  CC: 0.5444  Avg: 0.6452
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7517  BP: 0.6209  CC: 0.5381  Avg: 0.6369 (Δ-0.0083)
+  Best Fmax: 0.6452
+  LR: 0.000488
+  Patience: 6/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.044
+  Chain pool: chain_gate_bias=-0.014, protein_gate_bias=-0.120
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.98
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 57°C | Power: 1 W
+Epoch 75 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:29<00:00,  1.32s/it, loss=0.0128, lr=0.000479, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 75 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:55<00:00,  6.66it/s]
+
+Epoch 75/100 (2017.1s)
+  Train Loss: 0.0128
+  Val Loss:   0.0299
+  --- Global Threshold Fmax ---
+  MF: 0.7527  BP: 0.5194  CC: 0.4550  Avg: 0.5757
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7561  BP: 0.6325  CC: 0.5369  Avg: 0.6418
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7487  BP: 0.6229  CC: 0.5377  Avg: 0.6364 (Δ-0.0054)
+  Best Fmax: 0.6418
+  LR: 0.000479
+  Patience: 7/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.044
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.122
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.88
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 76 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:26<00:00,  1.32s/it, loss=0.0127, lr=0.000466, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 76 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:58<00:00,  6.28it/s]
+
+Epoch 76/100 (2016.9s)
+  Train Loss: 0.0127
+  Val Loss:   0.0302
+  --- Global Threshold Fmax ---
+  MF: 0.7493  BP: 0.5159  CC: 0.4602  Avg: 0.5751
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7587  BP: 0.6261  CC: 0.5671  Avg: 0.6506
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7498  BP: 0.6215  CC: 0.5520  Avg: 0.6411 (Δ-0.0095)
+  Best Fmax: 0.6506
+  LR: 0.000466
+  Patience: 8/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.004, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.124
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.75
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 77 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:32<00:00,  1.33s/it, loss=0.0125, lr=0.000452, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 77 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:50<00:00,  7.38it/s]
+
+Epoch 77/100 (2014.8s)
+  Train Loss: 0.0125
+  Val Loss:   0.0308
+  --- Global Threshold Fmax ---
+  MF: 0.7629  BP: 0.5227  CC: 0.4538  Avg: 0.5798
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7611  BP: 0.6354  CC: 0.5437  Avg: 0.6467
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7583  BP: 0.6256  CC: 0.5422  Avg: 0.6420 (Δ-0.0047)
+  Best Fmax: 0.6467
+  LR: 0.000452
+  Patience: 9/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.005, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.125
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.74
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 78 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:47<00:00,  1.34s/it, loss=0.0121, lr=0.000434, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 78 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.22it/s]
+
+Epoch 78/100 (2030.0s)
+  Train Loss: 0.0121
+  Val Loss:   0.0315
+  --- Global Threshold Fmax ---
+  MF: 0.7548  BP: 0.5170  CC: 0.4400  Avg: 0.5706
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7590  BP: 0.6266  CC: 0.5349  Avg: 0.6402
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7507  BP: 0.6178  CC: 0.5321  Avg: 0.6336 (Δ-0.0066)
+  Best Fmax: 0.6402
+  LR: 0.000434
+  Patience: 10/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.044
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.127
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.87
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 79 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:31<00:00,  1.33s/it, loss=0.0119, lr=0.000415, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 79 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.13it/s]
+
+Epoch 79/100 (2015.1s)
+  Train Loss: 0.0119
+  Val Loss:   0.0311
+  --- Global Threshold Fmax ---
+  MF: 0.7520  BP: 0.5296  CC: 0.4634  Avg: 0.5817
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7606  BP: 0.6340  CC: 0.5446  Avg: 0.6464
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7553  BP: 0.6230  CC: 0.5435  Avg: 0.6406 (Δ-0.0058)
+  Best Fmax: 0.6464
+  LR: 0.000415
+  Patience: 11/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.128
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.80
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 80 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:25<00:00,  1.32s/it, loss=0.0115, lr=0.000393, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 80 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.16it/s]
+
+Epoch 80/100 (2009.0s)
+  Train Loss: 0.0115
+  Val Loss:   0.0325
+  --- Global Threshold Fmax ---
+  MF: 0.7610  BP: 0.5269  CC: 0.4621  Avg: 0.5834
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7690  BP: 0.6365  CC: 0.5642  Avg: 0.6566
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7578  BP: 0.6299  CC: 0.5604  Avg: 0.6493 (Δ-0.0072)
+  Best Fmax: 0.6566
+  LR: 0.000393
+  Patience: 12/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.006, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.130
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.73
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 81 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:46<00:00,  1.34s/it, loss=0.0113, lr=0.00037, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 81 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.24it/s]
+
+Epoch 81/100 (2029.4s)
+  Train Loss: 0.0113
+  Val Loss:   0.0318
+  --- Global Threshold Fmax ---
+  MF: 0.7623  BP: 0.5273  CC: 0.4653  Avg: 0.5850
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7700  BP: 0.6378  CC: 0.5643  Avg: 0.6574
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7634  BP: 0.6296  CC: 0.5518  Avg: 0.6483 (Δ-0.0091)
+  Best Fmax: 0.6574
+  LR: 0.000370
+  Patience: 13/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.131
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.94
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 57°C | Power: 1 W
+Epoch 82 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:45<00:00,  1.34s/it, loss=0.0108, lr=0.000346, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 82 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.78it/s]
+
+Epoch 82/100 (2032.3s)
+  Train Loss: 0.0108
+  Val Loss:   0.0333
+  --- Global Threshold Fmax ---
+  MF: 0.7637  BP: 0.5337  CC: 0.4653  Avg: 0.5876
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7710  BP: 0.6448  CC: 0.5692  Avg: 0.6617
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7650  BP: 0.6346  CC: 0.5676  Avg: 0.6558 (Δ-0.0059)
+  Best Fmax: 0.6617
+  LR: 0.000346
+  Patience: 14/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.133
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.81
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 57°C | Power: 1 W
+Epoch 83 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:41<00:00,  1.33s/it, loss=0.0104, lr=0.00032, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 83 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:58<00:00,  6.36it/s]
+
+Epoch 83/100 (2031.5s)
+  Train Loss: 0.0104
+  Val Loss:   0.0336
+  --- Global Threshold Fmax ---
+  MF: 0.7632  BP: 0.5424  CC: 0.4723  Avg: 0.5926
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7716  BP: 0.6531  CC: 0.5554  Avg: 0.6600
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7651  BP: 0.6449  CC: 0.5549  Avg: 0.6550 (Δ-0.0050)
+  Best Fmax: 0.6600
+  LR: 0.000320
+  Patience: 15/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.135
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.83
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 84 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [32:53<00:00,  1.34s/it, loss=0.00995, lr=0.000293, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 84 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:02<00:00,  5.96it/s]
+
+Epoch 84/100 (2047.0s)
+  Train Loss: 0.0100
+  Val Loss:   0.0335
+  --- Global Threshold Fmax ---
+  MF: 0.7695  BP: 0.5426  CC: 0.4724  Avg: 0.5948
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7730  BP: 0.6496  CC: 0.5759  Avg: 0.6662
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7675  BP: 0.6446  CC: 0.5701  Avg: 0.6607 (Δ-0.0054)
+  Best Fmax: 0.6662
+  LR: 0.000293
+  Patience: 16/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.017, protein_gate_bias=-0.136
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.99
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 85 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [32:55<00:00,  1.34s/it, loss=0.00962, lr=0.000266, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 85 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.23it/s]
+
+Epoch 85/100 (2038.5s)
+  Train Loss: 0.0096
+  Val Loss:   0.0331
+  --- Global Threshold Fmax ---
+  MF: 0.7676  BP: 0.5374  CC: 0.4642  Avg: 0.5897
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7761  BP: 0.6519  CC: 0.5579  Avg: 0.6620
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7688  BP: 0.6449  CC: 0.5499  Avg: 0.6546 (Δ-0.0074)
+  Best Fmax: 0.6620
+  LR: 0.000266
+  Patience: 17/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.137
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.91
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 86 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:01<00:00,  1.35s/it, loss=0.00914, lr=0.000239, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 86 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.97it/s]
+
+Epoch 86/100 (2046.4s)
+  Train Loss: 0.0091
+  Val Loss:   0.0358
+  --- Global Threshold Fmax ---
+  MF: 0.7693  BP: 0.5434  CC: 0.4704  Avg: 0.5944
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7777  BP: 0.6517  CC: 0.5858  Avg: 0.6717
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7680  BP: 0.6408  CC: 0.5834  Avg: 0.6640 (Δ-0.0077)
+  Best Fmax: 0.6717 (best)
+  LR: 0.000239
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.017, protein_gate_bias=-0.138
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.79
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6717)
+Epoch 87 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:00<00:00,  1.35s/it, loss=0.00867, lr=0.000212, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 87 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:15<00:00,  4.90it/s]
+
+Epoch 87/100 (2068.4s)
+  Train Loss: 0.0087
+  Val Loss:   0.0361
+  --- Global Threshold Fmax ---
+  MF: 0.7748  BP: 0.5431  CC: 0.4689  Avg: 0.5956
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7751  BP: 0.6563  CC: 0.5654  Avg: 0.6656
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7680  BP: 0.6491  CC: 0.5619  Avg: 0.6597 (Δ-0.0060)
+  Best Fmax: 0.6656
+  LR: 0.000212
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.139
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.87
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 88 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [35:45<00:00,  1.46s/it, loss=0.00824, lr=0.000185, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 88 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:28<00:00,  4.19it/s]
+
+Epoch 88/100 (2245.2s)
+  Train Loss: 0.0082
+  Val Loss:   0.0393
+  --- Global Threshold Fmax ---
+  MF: 0.7766  BP: 0.5440  CC: 0.4643  Avg: 0.5950
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7796  BP: 0.6546  CC: 0.5620  Avg: 0.6654
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7737  BP: 0.6463  CC: 0.5564  Avg: 0.6588 (Δ-0.0066)
+  Best Fmax: 0.6654
+  LR: 0.000185
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.002, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.140
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.75
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 89 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [32:56<00:00,  1.34s/it, loss=0.00786, lr=0.000159, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 89 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:50<00:00,  7.39it/s]
+
+Epoch 89/100 (2038.6s)
+  Train Loss: 0.0079
+  Val Loss:   0.0385
+  --- Global Threshold Fmax ---
+  MF: 0.7782  BP: 0.5502  CC: 0.4736  Avg: 0.6007
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7850  BP: 0.6594  CC: 0.5592  Avg: 0.6679
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7772  BP: 0.6527  CC: 0.5588  Avg: 0.6629 (Δ-0.0050)
+  Best Fmax: 0.6679
+  LR: 0.000159
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.141
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.85
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 90 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [33:02<00:00,  1.35s/it, loss=0.00738, lr=0.000135, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 90 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [01:28<00:00,  4.17it/s]
+
+Epoch 90/100 (2083.2s)
+  Train Loss: 0.0074
+  Val Loss:   0.0403
+  --- Global Threshold Fmax ---
+  MF: 0.7788  BP: 0.5520  CC: 0.4730  Avg: 0.6013
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7892  BP: 0.6676  CC: 0.5738  Avg: 0.6769
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7810  BP: 0.6603  CC: 0.5605  Avg: 0.6673 (Δ-0.0096)
+  Best Fmax: 0.6769 (best)
+  LR: 0.000135
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.141
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.79
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6769)
+Epoch 91 [Train]: 100%|███████████████████████████████████████████████████████████| 1472/1472 [35:44<00:00,  1.46s/it, loss=0.00697, lr=0.000111, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 91 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.05it/s]
+
+Epoch 91/100 (2209.0s)
+  Train Loss: 0.0070
+  Val Loss:   0.0417
+  --- Global Threshold Fmax ---
+  MF: 0.7804  BP: 0.5569  CC: 0.4743  Avg: 0.6039
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7908  BP: 0.6702  CC: 0.5529  Avg: 0.6713
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7805  BP: 0.6633  CC: 0.5510  Avg: 0.6649 (Δ-0.0064)
+  Best Fmax: 0.6713
+  LR: 0.000111
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.003, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.142
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.89
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 54°C | Power: 1 W
+Epoch 92 [Train]: 100%|█████████████████████████████████████████████████████████████| 1472/1472 [32:41<00:00,  1.33s/it, loss=0.0066, lr=8.93e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 92 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.92it/s]
+
+Epoch 92/100 (2026.4s)
+  Train Loss: 0.0066
+  Val Loss:   0.0438
+  --- Global Threshold Fmax ---
+  MF: 0.7803  BP: 0.5568  CC: 0.4775  Avg: 0.6049
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7875  BP: 0.6627  CC: 0.5705  Avg: 0.6736
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7782  BP: 0.6556  CC: 0.5647  Avg: 0.6662 (Δ-0.0074)
+  Best Fmax: 0.6736
+  LR: 0.000089
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.142
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.78
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 53°C | Power: 1 W
+Epoch 93 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:23<00:00,  1.32s/it, loss=0.00619, lr=6.94e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 93 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.18it/s]
+
+Epoch 93/100 (2006.5s)
+  Train Loss: 0.0062
+  Val Loss:   0.0461
+  --- Global Threshold Fmax ---
+  MF: 0.7832  BP: 0.5574  CC: 0.4805  Avg: 0.6070
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7896  BP: 0.6674  CC: 0.5672  Avg: 0.6747
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7817  BP: 0.6628  CC: 0.5675  Avg: 0.6707 (Δ-0.0040)
+  Best Fmax: 0.6747
+  LR: 0.000069
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.046
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.142
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.71
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 53°C | Power: 1 W
+Epoch 94 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:40<00:00,  1.33s/it, loss=0.00587, lr=5.17e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 94 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.08it/s]
+
+Epoch 94/100 (2024.8s)
+  Train Loss: 0.0059
+  Val Loss:   0.0460
+  --- Global Threshold Fmax ---
+  MF: 0.7833  BP: 0.5618  CC: 0.4829  Avg: 0.6093
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7888  BP: 0.6715  CC: 0.5859  Avg: 0.6821
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7812  BP: 0.6644  CC: 0.5852  Avg: 0.6770 (Δ-0.0051)
+  Best Fmax: 0.6821 (best)
+  LR: 0.000052
+  Patience: 0/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.016, protein_gate_bias=-0.142
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=2.02
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+  → Saved best model (Fmax_best: 0.6821)
+Epoch 95 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:45<00:00,  1.34s/it, loss=0.00554, lr=3.63e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 95 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:56<00:00,  6.55it/s]
+
+Epoch 95/100 (2034.2s)
+  Train Loss: 0.0055
+  Val Loss:   0.0498
+  --- Global Threshold Fmax ---
+  MF: 0.7838  BP: 0.5614  CC: 0.4834  Avg: 0.6095
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7893  BP: 0.6734  CC: 0.5709  Avg: 0.6779
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7823  BP: 0.6679  CC: 0.5685  Avg: 0.6729 (Δ-0.0050)
+  Best Fmax: 0.6779
+  LR: 0.000036
+  Patience: 1/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.001, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.143
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.85
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 96 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:49<00:00,  1.34s/it, loss=0.00531, lr=2.34e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 96 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:54<00:00,  6.75it/s]
+
+Epoch 96/100 (2036.0s)
+  Train Loss: 0.0053
+  Val Loss:   0.0522
+  --- Global Threshold Fmax ---
+  MF: 0.7853  BP: 0.5634  CC: 0.4857  Avg: 0.6115
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7926  BP: 0.6709  CC: 0.5712  Avg: 0.6782
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7867  BP: 0.6662  CC: 0.5660  Avg: 0.6730 (Δ-0.0053)
+  Best Fmax: 0.6782
+  LR: 0.000023
+  Patience: 2/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.143
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.77
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 97 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:35<00:00,  1.33s/it, loss=0.00508, lr=1.33e-5, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 97 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:51<00:00,  7.22it/s]
+
+Epoch 97/100 (2018.4s)
+  Train Loss: 0.0051
+  Val Loss:   0.0548
+  --- Global Threshold Fmax ---
+  MF: 0.7858  BP: 0.5651  CC: 0.4865  Avg: 0.6125
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7905  BP: 0.6734  CC: 0.5762  Avg: 0.6800
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7844  BP: 0.6713  CC: 0.5749  Avg: 0.6769 (Δ-0.0031)
+  Best Fmax: 0.6800
+  LR: 0.000013
+  Patience: 3/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.143
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.72
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+Epoch 98 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [33:06<00:00,  1.35s/it, loss=0.00493, lr=5.92e-6, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 98 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.90it/s]
+
+Epoch 98/100 (2052.2s)
+  Train Loss: 0.0049
+  Val Loss:   0.0562
+  --- Global Threshold Fmax ---
+  MF: 0.7848  BP: 0.5638  CC: 0.4848  Avg: 0.6111
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7913  BP: 0.6732  CC: 0.5730  Avg: 0.6792
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7833  BP: 0.6685  CC: 0.5717  Avg: 0.6745 (Δ-0.0047)
+  Best Fmax: 0.6792
+  LR: 0.000006
+  Patience: 4/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.143
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.74
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 99 [Train]: 100%|████████████████████████████████████████████████████████████| 1472/1472 [32:57<00:00,  1.34s/it, loss=0.00483, lr=1.49e-6, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 99 [Val]: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:52<00:00,  7.01it/s]
+
+Epoch 99/100 (2041.8s)
+  Train Loss: 0.0048
+  Val Loss:   0.0570
+  --- Global Threshold Fmax ---
+  MF: 0.7873  BP: 0.5654  CC: 0.4870  Avg: 0.6132
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7949  BP: 0.6744  CC: 0.5721  Avg: 0.6804
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7887  BP: 0.6673  CC: 0.5709  Avg: 0.6756 (Δ-0.0048)
+  Best Fmax: 0.6804
+  LR: 0.000001
+  Patience: 5/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.143
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.72
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 56°C | Power: 1 W
+Epoch 100 [Train]: 100%|██████████████████████████████████████████████████████████████| 1472/1472 [33:06<00:00,  1.35s/it, loss=0.00479, lr=2e-9, esm=100%]
+  [Pre-val] GPU: 0.04 GB alloc, 0.11 GB reserved
+Epoch 100 [Val]: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████| 370/370 [00:53<00:00,  6.85it/s]
+
+Epoch 100/100 (2052.5s)
+  Train Loss: 0.0048
+  Val Loss:   0.0573
+  --- Global Threshold Fmax ---
+  MF: 0.7864  BP: 0.5645  CC: 0.4867  Avg: 0.6125
+  --- Per-Class Threshold Fmax (raw) ---
+  MF: 0.7905  BP: 0.6755  CC: 0.5548  Avg: 0.6736
+  --- Per-Class Threshold Fmax (propagated) ---
+  MF: 0.7844  BP: 0.6677  CC: 0.5531  Avg: 0.6684 (Δ-0.0052)
+  Best Fmax: 0.6736
+  LR: 0.000000
+  Patience: 6/20
+  ESM2 coverage: 100.0% of batches
+  ESM2 gate stats: scale=1.000, bias_mean=0.045
+  Chain pool: chain_gate_bias=-0.015, protein_gate_bias=-0.143
+  VRAM (GB): alloc=0.04, reserved=1.42, peak=1.77
+  GPU: 0% | VRAM: 1.77/8.00 GB | Temp: 55°C | Power: 1 W
+
+======================================================================
+Training completed in 1093.3 minutes
+Best validation Fmax (best of raw/propagated): 0.6821 @ epoch 94
+======================================================================
+
+  Loading best model for testing...
+Loaded checkpoint from epoch 93
+Testing: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 367/367 [01:28<00:00,  4.15it/s]
+
+======================================================================
+TEST RESULTS (v13 - Hierarchical Chain-Aware Pooling)
+======================================================================
+Architecture: Dual-Conv (GCN + GATv2) × 4 + Chain Emb (8-d) + ESM2 (1280-d) + Chain Pool (True) + GO-DAG
+ESM2 test coverage: 100.0%
+
+--- Global Threshold Fmax ---
+MF: 0.7807  AUPRC: 0.7916
+BP: 0.5752  AUPRC: 0.5454
+CC: 0.5118  AUPRC: 0.4445
+Combined: 0.6225
+
+--- Per-Class Threshold Fmax (raw) ---
+MF: 0.7749  P: 0.7847  R: 0.7653
+BP: 0.6743  P: 0.6940  R: 0.6557
+CC: 0.5639  P: 0.5876  R: 0.5420
+Combined: 0.6710
+
+--- Per-Class Threshold Fmax (propagated) ---
+MF: 0.7696  P: 0.7708  R: 0.7684
+BP: 0.6707  P: 0.6838  R: 0.6580
+CC: 0.5653  P: 0.5802  R: 0.5511
+Combined: 0.6685 (Δ-0.0025 from propagation)
+
+Best Combined Fmax: 0.6710
+======================================================================
+
+  Training complete in 18.2h
+  Test results saved to: output_v13\checkpoints\test_results.json
+  ESM2 loader stats: {'available': True, 'esm_dim': 1280, 'cache_size': 200, 'hits': 851191, 'misses': 0, 'hit_rate': 1.0}
+
+============================================================
+STEP 3: Compare v13 with Baselines
+============================================================
+  Loaded v7 results from output_v7\checkpoints\test_results.json
+  v9 results not found at output_v9\checkpoints\test_results.json
+  Loaded v10 results from output_v10\checkpoints\test_results.json
+  Loaded v11 results from output_v11\checkpoints\test_results.json
+  Loaded v12 results from output_v12\checkpoints\test_results.json
+
+  Version             MF          BP          CC    Combined
+  ----------------------------------------------------------
+  v7              0.5241      0.4703      0.5317      0.5087
+  v10             0.6221      0.5144      0.4367      0.5244
+  v11             0.7647      0.6508      0.5458      0.6538
+  v12             0.7637      0.6507      0.5543      0.6562
+  v13 raw         0.7749      0.6743      0.5639      0.6710
+  v13 prop        0.7696      0.6707      0.5653      0.6685
+
+  --- v12 → v13 Delta (Hierarchical Chain-Aware Pooling) ---
+    MF: 0.7585 → 0.7696 (+0.0111)
+    BP: 0.6454 → 0.6707 (+0.0253)
+    CC: 0.5460 → 0.5653 (+0.0192)
+    Combined: 0.6500 → 0.6685 (+0.0185)
+
+  --- Propagation Gain ---
+    Raw:        0.6710
+    Propagated: 0.6685
+    Gain:       -0.0025
+
+  v13 Model info:
+    Chain-aware pooling: True
+    ESM2 dim:           1280
+    ESM2 test coverage: 100.0%
+
+  Comparison saved to: output_v13\v13_comparison.json
+
+============================================================
+  v13 Pipeline Complete
+  Finished: 2026-03-10 07:44:44
+  Log saved: output_v13\pipeline_log.json
+============================================================
