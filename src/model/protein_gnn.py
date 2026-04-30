@@ -1,58 +1,3 @@
-"""
-protein_gnn.py — ProteinGNN: Hierarchical Chain-Aware GNN (v13 Architecture)
-
-This is the best-performing model architecture, corresponding to version 13 of
-the protein function prediction pipeline. It predicts Gene Ontology (GO) terms
-for three ontologies simultaneously:
-
-    y_MF ∈ {0,1}^489    Molecular Function
-    y_BP ∈ {0,1}^1943   Biological Process
-    y_CC ∈ {0,1}^320    Cellular Component
-
-Architecture Overview
----------------------
-Input representation:
-  - Protein structure graph: nodes = residues, edges = Cα contacts within 8 Å
-  - Node features (40-d): one-hot amino acid + physicochemical + structural
-  - Edge features  ( 5-d): distance + sequence separation + bond type flags
-  - Chain embedding ( 8-d): learned per-chain identity vector
-  - ESM2 embeddings (1280-d, optional): per-residue evolutionary context from
-    the 650M-parameter ESM2 language model, pre-computed offline
-
-Encoding stage:
-  1. chain_embedding(chain_idx)   → 8-d chain identity
-  2. NodeEncoder [48-d → hidden]  → structural node representation h
-  3. ESM2GatedFusion              → blends h with projected ESM2 per residue
-  4. EdgeEncoder [5-d → hidden]   → edge representation e
-  5. DualConvBlock × 4            → GCN + GATv2 message passing with residuals
-
-Pooling stage — two parallel branches:
-  Branch 1 (residue-level): GatedAttentionPool ⊕ MeanPool ⊕ MaxPool → 192-d
-  Branch 2 (chain-aware):   ChainAttentionPool → ProteinChainPool    → 192-d
-  Merged protein embedding: concat(Branch 1, Branch 2)               → 384-d
-
-Prediction heads:
-  MF head: MLP(384 → 489)    no chain context needed
-  BP head: MLP(384 → 1943)   no chain context needed
-  CC head: MLP(576 → 320)    receives extra CCContextAttention(384, chains) → 576-d
-
-Novel contributions vs. prior work (DeepFRI, HEAL, GGN-GO, GOBoost):
-  1. PDB-level multi-chain graphs with inter-chain edges
-  2. Hierarchical pooling: Residue → Chain → Protein
-  3. Chain-specific CC prediction via cross-attention
-  4. ESM2 gated fusion (learned per-residue weighting)
-
-Parameter count (default 8 GB VRAM config): ~2.28M
-
-Usage
------
-    from src.model import create_model, ProteinGNN
-    model = create_model(n_mf=489, n_bp=1943, n_cc=320)
-    mf_logits, bp_logits, cc_logits = model(x, edge_index, batch,
-                                            edge_attr=edge_attr,
-                                            chain_idx=chain_idx,
-                                            esm_emb=esm_emb)
-"""
 
 from __future__ import annotations
 
@@ -87,44 +32,6 @@ from .building_blocks import (
 
 
 class ProteinGNN(nn.Module):
-    """
-    Hierarchical Chain-Aware GNN for Protein Function Prediction.
-
-    Parameters
-    ----------
-    node_dim : int
-        Input node feature dimension (default 40).
-    edge_dim : int
-        Input edge feature dimension (default 5).
-    hidden : int
-        Hidden dimension throughout the GNN backbone (default 192).
-    n_mf, n_bp, n_cc : int
-        Number of GO classes per ontology.
-    n_layers : int
-        Number of stacked DualConvBlocks (default 4).
-    heads : int
-        GATv2 attention heads per block (default 6).
-    dropout : float
-        Dropout probability (default 0.2).
-    use_label_embed : bool
-        If True, use LabelEmbeddingHead (cosine similarity);
-        if False, use a plain MLP head.
-    label_emb_dim : int
-        Shared embedding space for LabelEmbeddingHead (default 192).
-    chain_emb_dim : int
-        Dimension of the learned chain identity embedding (default 8).
-    max_chains : int
-        Maximum number of distinct chains supported (default 64).
-    esm_dim : int
-        Dimension of raw ESM2 per-residue embeddings (default 1280).
-    use_chain_pool : bool
-        If True, activate hierarchical chain-aware pooling (v13).
-        If False, model is equivalent to the v11 architecture.
-    use_gradient_checkpointing : bool
-        Trade-off compute for memory by checkpointing GNN blocks.
-    init_embeddings_{mf,bp,cc} : np.ndarray or None
-        Optional pre-computed label embeddings (e.g. from co-occurrence SVD).
-    """
 
     def __init__(
         self,
@@ -262,7 +169,6 @@ class ProteinGNN(nn.Module):
 
     @staticmethod
     def _make_mlp_head(in_dim: int, n_classes: int, dropout: float) -> nn.Sequential:
-        """Plain two-layer MLP classification head."""
         return nn.Sequential(
             nn.Linear(in_dim, in_dim // 2),
             nn.LayerNorm(in_dim // 2),
@@ -276,17 +182,6 @@ class ProteinGNN(nn.Module):
         batch: torch.Tensor,
         chain_idx: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Map each node to a unique (graph_id, chain_id) pair index.
-
-        Returns
-        -------
-        chain_batch : [N]
-            Consecutive chain index per node (used like the `batch` tensor
-            but at chain granularity instead of graph granularity).
-        chain_to_graph : [num_chains]
-            Graph index for each unique chain.
-        """
         # Clamp chain indices to valid range
         chain_idx_clamped = chain_idx.clamp(0, self.max_chains - 1)
         # Encode (graph, chain) pair as a single integer
@@ -304,13 +199,6 @@ class ProteinGNN(nn.Module):
         chain_idx: Optional[torch.Tensor],
         esm_emb: Optional[torch.Tensor],
     ) -> torch.Tensor:
-        """
-        Shared backbone: chain embed → node encode → ESM2 fuse → GNN blocks.
-
-        Returns
-        -------
-        h : [N, hidden]  residue embeddings after message passing.
-        """
         # Step 1: Attach chain identity embedding to node features
         if chain_idx is not None:
             ci = chain_idx.clamp(0, self.max_chains - 1)
@@ -351,23 +239,6 @@ class ProteinGNN(nn.Module):
         chain_idx: Optional[torch.Tensor] = None,
         esm_emb: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Full forward pass with hierarchical chain-aware pooling.
-
-        Parameters
-        ----------
-        x :          [N, 40]          node features
-        edge_index : [2, E]           edge connectivity (COO format)
-        batch :      [N]              graph index per node
-        edge_attr :  [E, 5]           edge features (optional)
-        chain_idx :  [N]              chain index per residue (optional)
-        esm_emb :    [N, esm_dim]     ESM2 per-residue embeddings (optional)
-
-        Returns
-        -------
-        (mf_logits, bp_logits, cc_logits)
-            Each tensor is [B, n_classes] raw logits (before sigmoid).
-        """
         # ── GNN backbone ─────────────────────────────────────────────────────
         h = self._encode_nodes(x, edge_index, edge_attr, chain_idx, esm_emb)
 
@@ -467,7 +338,6 @@ class ProteinGNN(nn.Module):
         }
 
     def get_chain_pool_stats(self) -> Dict[str, float]:
-        """Return chain-pool gate statistics for training-time monitoring."""
         if not self.use_chain_pool:
             return {}
         chain_gate = self.chain_attn_pool.gate[0]
@@ -496,28 +366,6 @@ def create_model(
     init_embeddings_bp: Optional[np.ndarray] = None,
     init_embeddings_cc: Optional[np.ndarray] = None,
 ) -> ProteinGNN:
-    """
-    Instantiate a ProteinGNN with VRAM-appropriate hyperparameters.
-
-    VRAM presets
-    ------------
-    ≥ 8 GB : hidden=192, 4 layers, 6 heads   (default — fits comfortably)
-    ≥ 6 GB : hidden=160, 4 layers, 4 heads
-    < 6 GB : hidden=128, 3 layers, 4 heads   (minimal memory footprint)
-
-    Parameters
-    ----------
-    n_mf, n_bp, n_cc : int   GO class counts per ontology.
-    vram_gb : float          Available GPU memory in gigabytes.
-    esm_dim : int            ESM2 embedding dimension.
-    use_label_embed : bool   Use cosine-similarity heads.
-    use_chain_pool : bool    Activate hierarchical chain-aware pooling.
-    init_embeddings_* :      Optional SVD label embedding warm-starts.
-
-    Returns
-    -------
-    ProteinGNN  (ready to call .to(device))
-    """
     if vram_gb >= 8.0:
         cfg = {"hidden": 192, "n_layers": 4, "heads": 6, "dropout": 0.2, "label_emb_dim": 192}
     elif vram_gb >= 6.0:
@@ -547,12 +395,10 @@ def create_model(
 
 
 def count_parameters(model: nn.Module) -> int:
-    """Total number of trainable parameters."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 def count_layer_parameters(model: ProteinGNN) -> Dict[str, int]:
-    """Per-component parameter breakdown (useful for debugging)."""
     counts: Dict[str, int] = {}
 
     def _count(module: nn.Module) -> int:
