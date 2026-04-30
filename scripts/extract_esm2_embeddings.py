@@ -541,10 +541,10 @@ def main():
                         help="Disable FP16 for ESM2 inference")
 
     # Mode-specific arguments
-    parser.add_argument("--pdb-dir", type=str, default="pdbs",
+    parser.add_argument("--pdb-dir", type=str, default="data/pdbs",
                         help="PDB/CIF file directory (for --from-pdb)")
-    parser.add_argument("--graphs-dir", type=str, default="output_v10/graphs_v10",
-                        help="v10 graph directory (for --from-graphs)")
+    parser.add_argument("--graphs-dir", type=str, default="data/graphs",
+                        help="Graph directory (for --from-graphs)")
     parser.add_argument("--min-residues", type=int, default=10)
     parser.add_argument("--max-residues", type=int, default=5000)
 

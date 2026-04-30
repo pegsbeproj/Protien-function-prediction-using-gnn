@@ -30,8 +30,8 @@ Training Protocol: v11 + hierarchy
   Ancestor propagation is CPU-only numpy at eval time.
 
 Usage:
-    python train_v12.py --graphs-dir output_v10/graphs_v10 --esm2-dir output_v11/esm2_embeddings
-    python train_v12.py --graphs-dir output_v10/graphs_v10 --esm2-dir output_v11/esm2_embeddings --resume output_v12/checkpoints
+    python train_v12.py --graphs-dir data/graphs --esm2-dir data/esm2_embeddings
+    python train_v12.py --graphs-dir data/graphs --esm2-dir data/esm2_embeddings --resume output_v12/checkpoints
     python train_v12.py --test-only --checkpoint-dir output_v12/checkpoints
     python train_v12.py --compare
 """
@@ -1038,18 +1038,18 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='v12 Training - GO-DAG-Aware Hierarchical')
-    parser.add_argument('--graphs-dir', type=str, default='output_v10/graphs_v10',
-                        help='Directory with v10 graph files (reused)')
-    parser.add_argument('--esm2-dir', type=str, default='output_v11/esm2_embeddings',
-                        help='Directory with ESM2 embedding files (reused from v11)')
+    parser.add_argument('--graphs-dir', type=str, default='data/graphs',
+                        help='Directory with graph batch files')
+    parser.add_argument('--esm2-dir', type=str, default='data/esm2_embeddings',
+                        help='Directory with ESM2 embedding files')
     parser.add_argument('--esm2-dim', type=int, default=V11_ESM2_DIM,
                         help=f'ESM2 embedding dimension (default: {V11_ESM2_DIM})')
-    parser.add_argument('--obo-file', type=str, default='annotations/go-basic.obo',
+    parser.add_argument('--obo-file', type=str, default='data/annotations/go-basic.obo',
                         help='Path to GO OBO file')
     parser.add_argument('--checkpoint-dir', type=str, default='output_v12/checkpoints',
                         help='Directory to save checkpoints')
     parser.add_argument('--annotation-file', type=str,
-                        default='annotations/nrPDB-GO_2019.06.18_annot.tsv')
+                        default='data/annotations/nrPDB-GO_2019.06.18_annot.tsv')
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--accum-steps', type=int, default=1)

@@ -8,8 +8,8 @@ Runs the complete v13 experiment:
   Step 3: Evaluate and compare with v12 and baselines
 
 v13 reuses:
-  - v10 graph structure      (from output_v10/graphs_v10)
-  - v11 ESM2 embeddings      (from output_v11/esm2_embeddings)
+  - graph structure          (from data/graphs)
+  - ESM2 embeddings          (from data/esm2_embeddings)
 
 v13 model adds over v12:
   - Two-branch pooling: residue-level (preserved) + chain-aware (new)
@@ -20,25 +20,25 @@ v13 model adds over v12:
 
 Usage:
     # Full pipeline:
-    python run_pipeline_v13.py --output-dir output_v13 --graphs-dir output_v10/graphs_v10
+    python scripts/run_pipeline.py --output-dir output_v13 --graphs-dir data/graphs
 
     # Resume training:
-    python run_pipeline_v13.py --output-dir output_v13 --graphs-dir output_v10/graphs_v10 --resume
+    python scripts/run_pipeline.py --output-dir output_v13 --graphs-dir data/graphs --resume
 
     # Test only (compare):
-    python run_pipeline_v13.py --test-only --output-dir output_v13
+    python scripts/run_pipeline.py --test-only --output-dir output_v13
 
     # Compare only:
-    python run_pipeline_v13.py --compare-only --output-dir output_v13
+    python scripts/run_pipeline.py --compare-only --output-dir output_v13
 
     # Ablation: no chain pooling (equivalent to v12):
-    python run_pipeline_v13.py --no-chain-pool --output-dir output_v13_ablation
+    python scripts/run_pipeline.py --no-chain-pool --output-dir output_v13_ablation
 
     # Ablation: no hierarchy loss:
-    python run_pipeline_v13.py --no-hier-loss --output-dir output_v13
+    python scripts/run_pipeline.py --no-hier-loss --output-dir output_v13
 
     # Ablation: no propagation:
-    python run_pipeline_v13.py --no-propagation --output-dir output_v13
+    python scripts/run_pipeline.py --no-propagation --output-dir output_v13
 """
 
 import argparse
@@ -115,13 +115,14 @@ def run_ancestor_verification(
     graphs_dir: str,
     esm2_dir: str,
     esm2_dim: int,
+    use_official_splits: bool = True,
 ) -> dict:
     """Verify that annotations have proper ancestor closure."""
     print("\n" + "=" * 60)
     print("STEP 1: Verify Ancestor Closure in Annotations")
     print("=" * 60)
 
-    from dataset_v11 import get_dataloaders_v11
+    from src.data.multi_chain_dataset import get_dataloaders_v11
 
     start_time = time.time()
 
@@ -137,6 +138,7 @@ def run_ancestor_verification(
         train_ratio=0.8,
         val_ratio=0.1,
         seed=42,
+        use_official_splits=use_official_splits,
     )
 
     mf_terms = train_dataset.parser.mf_terms
@@ -191,12 +193,14 @@ def run_training(
     use_propagation: bool = True,
     use_chain_pool: bool = True,
     use_amp: bool = True,
+    use_official_splits: bool = True,
 ) -> dict:
     """Train v13 model with hierarchical chain-aware pooling + GO-DAG."""
     print("\n" + "=" * 60)
     print("STEP 2: Train v13 Model (Hierarchical Chain-Aware Pooling)")
     print("=" * 60)
 
+    from src.data.multi_chain_dataset import get_dataloaders_v11
     from src.model.protein_gnn import create_model, count_parameters, count_layer_parameters
     from src.training.trainer import Trainer
     from src.data.go_hierarchy import HierarchicalConsistencyLoss, AncestorPropagator
@@ -227,6 +231,7 @@ def run_training(
     print(f"  Label embed:       {use_label_embed}")
     print(f"  Cooc regularizer:  {use_cooc_reg}")
     print(f"  AMP:               {use_amp}")
+    print(f"  DeepFRI splits:    {'ON' if use_official_splits else 'OFF (random split)'}")
 
     # Dataloaders (v11 = v10 graphs + ESM2)
     print("\n  Creating v13 data loaders (v10 graphs + ESM2 embeddings)...")
@@ -241,6 +246,7 @@ def run_training(
         train_ratio=0.8,
         val_ratio=0.1,
         seed=42,
+        use_official_splits=use_official_splits,
     )
 
     num_mf = train_dataset.num_mf
@@ -535,16 +541,16 @@ def main():
     )
     parser.add_argument("--output-dir", type=str, default="output_v13",
                         help="Output directory for v13 artifacts")
-    parser.add_argument("--graphs-dir", type=str, default="output_v10/graphs_v10",
-                        help="Pre-built v10 graphs (reused)")
+    parser.add_argument("--graphs-dir", type=str, default="data/graphs",
+                        help="Graph directory produced by scripts/build_graphs.py")
     parser.add_argument("--esm2-dir", type=str, default=None,
-                        help="ESM2 embeddings dir (default: output_v11/esm2_embeddings)")
+                        help="ESM2 embeddings dir (default: data/esm2_embeddings)")
     parser.add_argument("--esm2-dim", type=int, default=1280,
                         help="ESM2 embedding dimension (default: 1280)")
-    parser.add_argument("--obo-file", type=str, default="annotations/go-basic.obo",
+    parser.add_argument("--obo-file", type=str, default="data/annotations/go-basic.obo",
                         help="Path to GO OBO file (downloaded if absent)")
     parser.add_argument("--annotation-file", type=str,
-                        default="annotations/nrPDB-GO_2019.06.18_annot.tsv")
+                        default="data/annotations/nrPDB-GO_2019.06.18_annot.tsv")
 
     # Training options
     parser.add_argument("--epochs", type=int, default=100)
@@ -575,11 +581,14 @@ def main():
     parser.add_argument("--no-propagation", action="store_true",
                         help="Disable ancestor propagation (hier-loss-only ablation)")
     parser.add_argument("--no-amp", action="store_true")
+    parser.add_argument("--no-deepfri-splits", action="store_true",
+                        help="Disable DeepFRI split auto-detection and use random splits")
 
     args = parser.parse_args()
 
     # Default ESM2 dir
-    esm2_dir = args.esm2_dir or str(Path("output_v11") / "esm2_embeddings")
+    esm2_dir = args.esm2_dir or str(Path("data") / "esm2_embeddings")
+    use_official_splits = not args.no_deepfri_splits
     use_chain_pool = not args.no_chain_pool
 
     print("=" * 60)
@@ -593,8 +602,8 @@ def main():
     print(f"    - GO hierarchy loss (weight={args.hier_weight})")
     print(f"    - Ancestor propagation at inference")
     print("  Reuses:")
-    print(f"    - v10 graphs:       {args.graphs_dir}")
-    print(f"    - v11 ESM2:         {esm2_dir}")
+    print(f"    - graphs:           {args.graphs_dir}")
+    print(f"    - ESM2 embeddings:  {esm2_dir}")
     print(f"  OBO file:             {args.obo_file}")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
@@ -623,7 +632,7 @@ def main():
     # ── Preflight checks ──
     if not Path(args.graphs_dir).exists():
         print(f"\n[ERROR] Graphs directory not found: {args.graphs_dir}")
-        print("  Ensure v10 graphs are available (run run_pipeline_v10.py first)")
+        print("  Build graphs first with: python scripts/build_graphs.py --pdb-dir data/pdbs --output-dir data/graphs")
         sys.exit(1)
 
     if not Path(esm2_dir).exists():
@@ -638,6 +647,7 @@ def main():
             graphs_dir=args.graphs_dir,
             esm2_dir=esm2_dir,
             esm2_dim=args.esm2_dim,
+            use_official_splits=use_official_splits,
         )
         pipeline_log["ancestor_verification"] = verify_result
 
@@ -674,16 +684,17 @@ def main():
             use_propagation=not args.no_propagation,
             use_chain_pool=use_chain_pool,
             use_amp=not args.no_amp,
+            use_official_splits=use_official_splits,
         )
         pipeline_log["training"] = result
     elif args.test_only:
         # Test-only mode: load best model and test
         print("\n  Test-only mode: loading best model...")
-        from train_v13 import TrainerV13
-        from dataset_v11 import get_dataloaders_v11
-        from model_v13 import create_v13_model
-        from go_hierarchy import HierarchicalConsistencyLoss, AncestorPropagator
-        from config import TrainingConfig, MemoryConfig
+        from src.training.trainer import Trainer
+        from src.data.multi_chain_dataset import get_dataloaders_v11
+        from src.model.protein_gnn import create_model
+        from src.data.go_hierarchy import AncestorPropagator
+        from src.config import TrainingConfig, MemoryConfig
 
         checkpoint_path = Path(args.output_dir) / "checkpoints" / "best.pt"
         if not checkpoint_path.exists():
@@ -706,12 +717,13 @@ def main():
             train_ratio=0.8,
             val_ratio=0.1,
             seed=42,
+            use_official_splits=use_official_splits,
         )
 
         actual_esm_dim = esm2_loader.esm_dim if esm2_loader else args.esm2_dim
         ckpt_chain_pool = model_config.get('use_chain_pool', use_chain_pool)
 
-        model = create_v13_model(
+        model = create_model(
             n_mf=train_dataset.num_mf,
             n_bp=train_dataset.num_bp,
             n_cc=train_dataset.num_cc,
@@ -733,7 +745,7 @@ def main():
         training_config = TrainingConfig(batch_size=batch_size)
         memory_config = MemoryConfig()
 
-        trainer = TrainerV13(
+        trainer = Trainer(
             model=model,
             train_loader=train_loader,
             val_loader=val_loader,

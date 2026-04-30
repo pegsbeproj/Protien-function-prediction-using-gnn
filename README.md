@@ -53,7 +53,14 @@ protein_gnn_v13/
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Build protein graphs from PDB files (STEP 1 — ~2-4 hours for full dataset)
+# 2. Prepare data folders
+mkdir -p data/pdbs data/annotations data/graphs data/esm2_embeddings
+
+# Place annotation file at:
+#   data/annotations/nrPDB-GO_2019.06.18_annot.tsv
+# (optional official split files can be placed in the same folder)
+
+# 3. Build protein graphs from PDB/CIF files (STEP 1)
 python scripts/build_graphs.py \
     --pdb-dir data/pdbs \
     --output-dir data/graphs \
@@ -61,39 +68,61 @@ python scripts/build_graphs.py \
     --max-neighbors 32 \
     --workers 4
 
-# 3. Extract ESM2 per-residue embeddings (STEP 2 — requires GPU, ~4-8 hours)
+# 4. Extract ESM2 per-residue embeddings (STEP 2)
 python scripts/extract_esm2_embeddings.py --from-graphs \
     --graphs-dir data/graphs \
     --output-dir data/esm2_embeddings \
     --model esm2_t33_650M_UR50D \
     --resume
 
-# 4. Run full training pipeline (STEP 3 — requires GPU, ~12-24 hours)
+# 5. Run full v13 pipeline (STEP 3)
 python scripts/run_pipeline.py \
     --graphs-dir data/graphs \
     --esm2-dir   data/esm2_embeddings \
-    --output-dir outputs/
+    --annotation-file data/annotations/nrPDB-GO_2019.06.18_annot.tsv \
+    --obo-file data/annotations/go-basic.obo \
+    --output-dir output_v13
 
 # Resume interrupted training
 python scripts/run_pipeline.py \
     --graphs-dir data/graphs \
-    --output-dir outputs/ \
+    --esm2-dir   data/esm2_embeddings \
+    --annotation-file data/annotations/nrPDB-GO_2019.06.18_annot.tsv \
+    --obo-file data/annotations/go-basic.obo \
+    --output-dir output_v13 \
     --resume
 
-# Ablation: disable hierarchical chain pooling (reproduces v11/v12 behaviour)
+# Use random splits (disable DeepFRI split auto-detection)
 python scripts/run_pipeline.py \
     --graphs-dir data/graphs \
-    --output-dir outputs/ablation_no_chain_pool/ \
+    --esm2-dir data/esm2_embeddings \
+    --annotation-file data/annotations/nrPDB-GO_2019.06.18_annot.tsv \
+    --obo-file data/annotations/go-basic.obo \
+    --output-dir output_v13_random \
+    --no-deepfri-splits
+
+# Ablation: disable hierarchical chain pooling (reproduces v11/v12 behavior)
+python scripts/run_pipeline.py \
+    --graphs-dir data/graphs \
+    --esm2-dir data/esm2_embeddings \
+    --annotation-file data/annotations/nrPDB-GO_2019.06.18_annot.tsv \
+    --obo-file data/annotations/go-basic.obo \
+    --output-dir output_v13_ablation_no_chain_pool \
     --no-chain-pool
 ```
 
 ## Key Results (best epoch)
 
-| Ontology | Fmax (raw) | Fmax (propagated) |
-|---|---|---|
-| MF | see `output_v13/checkpoints/test_results.json` | |
-| BP | | |
-| CC | | |
+From `output_v13/checkpoints/test_results.json` and `output_v13/smin_results.json`:
+
+| Ontology | Fmax (raw) | Fmax (propagated) | AUPR (micro) | Smin |
+|---|---:|---:|---:|---:|
+| MF | 0.7749 | 0.7696 | 0.7916 | 11.1329 |
+| BP | 0.6743 | 0.6707 | 0.5454 | 73.9094 |
+| CC | 0.5639 | 0.5653 | 0.4445 | 16.8913 |
+| **Combined** | **0.6710** | **0.6685** | — | **33.9778*** |
+
+\* Combined Smin is the mean of ontology Smin values.
 
 ## Novel Contributions
 
@@ -104,9 +133,19 @@ python scripts/run_pipeline.py \
 
 ## Data Dependencies
 
-| Artefact | Source |
+| Artefact | Required path |
 |---|---|
-| v10 graphs | `run_pipeline_v10.py` in parent project |
-| ESM2 embeddings | `esm2_finetune.py` + `extract_embeddings_v5.py` in parent project |
-| GO annotations | `annotations/nrPDB-GO_2019.06.18_annot.tsv` |
-| GO OBO file | Auto-downloaded from geneontology.org if absent |
+| Graph batches | `data/graphs/graphs_batch_*.pt` (from `scripts/build_graphs.py`) |
+| ESM2 embeddings | `data/esm2_embeddings/*.pt` (from `scripts/extract_esm2_embeddings.py`) |
+| GO annotations | `data/annotations/nrPDB-GO_2019.06.18_annot.tsv` |
+| Optional official splits | `data/annotations/nrPDB-GO_2019.06.18_{train,valid,test}.txt` |
+| GO OBO file | `data/annotations/go-basic.obo` (auto-downloaded if absent) |
+
+## Reproducibility Notes
+
+1. Run commands from the repository root (`protein_gnn_v13/`) so imports like `src.*` resolve.
+2. `--test-only` expects `output_v13/checkpoints/best.pt`.
+3. Output artifacts for paper reporting:
+   - `output_v13/checkpoints/test_results.json`
+   - `output_v13/smin_results.json`
+   - `output_v13/pipeline_log.json`

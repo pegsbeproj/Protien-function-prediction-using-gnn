@@ -1,0 +1,14 @@
+{
+  "mf": {
+    "smin": 11.132899,
+    "threshold_at_smin": 0.7100000000000001
+  },
+  "bp": {
+    "smin": 73.909361,
+    "threshold_at_smin": 0.65
+  },
+  "cc": {
+    "smin": 16.891276,
+    "threshold_at_smin": 0.45
+  }
+}

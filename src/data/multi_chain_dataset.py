@@ -341,6 +341,7 @@ def get_dataloaders_v11(
     train_split_file: Optional[str] = None,
     valid_split_file: Optional[str] = None,
     test_split_file: Optional[str] = None,
+    use_official_splits: bool = True,
     max_nodes: int = 2000,
     max_edges: int = 60000,
     pin_memory: bool = True,
@@ -368,6 +369,10 @@ def get_dataloaders_v11(
         train_split_file/valid_split_file/test_split_file:
             Optional split files (one ID per line). If all are available,
             these are used instead of random splitting.
+        use_official_splits:
+            If True, auto-detect DeepFRI split files next to annotation_file.
+            If False, skip auto-detection and use random split unless explicit
+            split files are provided.
         max_nodes/max_edges: Graph size limits
         pin_memory: Pin memory for GPU transfer
 
@@ -411,20 +416,23 @@ def get_dataloaders_v11(
 
     print(f"Total graph IDs (v11 PDB-level): {len(graph_ids)}")
 
-    # Resolve split files (explicit args first, then auto-detect common names)
+    # Resolve split files (explicit args first, then optional auto-detect)
     ann_path = Path(annotation_file)
-    if train_split_file is None:
-        auto_train = ann_path.parent / 'nrPDB-GO_2019.06.18_train.txt'
-        if auto_train.exists():
-            train_split_file = str(auto_train)
-    if valid_split_file is None:
-        auto_valid = ann_path.parent / 'nrPDB-GO_2019.06.18_valid.txt'
-        if auto_valid.exists():
-            valid_split_file = str(auto_valid)
-    if test_split_file is None:
-        auto_test = ann_path.parent / 'nrPDB-GO_2019.06.18_test.txt'
-        if auto_test.exists():
-            test_split_file = str(auto_test)
+    if use_official_splits:
+        if train_split_file is None:
+            auto_train = ann_path.parent / 'nrPDB-GO_2019.06.18_train.txt'
+            if auto_train.exists():
+                train_split_file = str(auto_train)
+        if valid_split_file is None:
+            auto_valid = ann_path.parent / 'nrPDB-GO_2019.06.18_valid.txt'
+            if auto_valid.exists():
+                valid_split_file = str(auto_valid)
+        if test_split_file is None:
+            auto_test = ann_path.parent / 'nrPDB-GO_2019.06.18_test.txt'
+            if auto_test.exists():
+                test_split_file = str(auto_test)
+    elif train_split_file is None and valid_split_file is None and test_split_file is None:
+        print("  DeepFRI split auto-detection disabled; using random split.")
 
     split_files_ready = all([train_split_file, valid_split_file, test_split_file])
 
@@ -555,7 +563,7 @@ def get_dataloaders_v11(
 if __name__ == '__main__':
     import sys
 
-    annotation_file = 'annotations/nrPDB-GO_2019.06.18_annot.tsv'
+    annotation_file = 'data/annotations/nrPDB-GO_2019.06.18_annot.tsv'
 
     if not Path(annotation_file).exists():
         print(f"Annotation file not found: {annotation_file}")
@@ -571,7 +579,7 @@ if __name__ == '__main__':
     print(f"  GO terms: MF={stats['num_mf_terms']}, BP={stats['num_bp_terms']}, CC={stats['num_cc_terms']}")
 
     # Test ESM2 loader (may or may not have embeddings)
-    esm_loader = ESM2EmbeddingLoader("output_v11/esm2_embeddings")
+    esm_loader = ESM2EmbeddingLoader("data/esm2_embeddings")
     print(f"\nESM2 loader stats: {esm_loader.get_stats()}")
 
     print("\n✓ Dataset v11 test passed!")
